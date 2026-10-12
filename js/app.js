@@ -440,7 +440,128 @@ function hashCode(str) {
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-const motionOn = () => document.documentElement.dataset.motion !== "off" && !reduceMotion;
+const motionOn = () => document.documentElement.dataset.motion !== "off";
+
+// ── ambient float ──
+// Every card bobs on a slow wave that ripples across the sheet, plus a small wobble
+// of its own. Cards run as compositor animations pinned to the document clock; link
+// ends read the same clock and ride along with their cards, so nothing comes loose.
+// To stay light, only cards near the visible area animate, and when zoomed far out
+// (where the float is about a pixel on screen) link ends stop following.
+const FLOAT_MS = 11000;  // one full cycle; every component is a whole-number harmonic of it
+const FLOAT_STEPS = 48;
+const LINKS_FOLLOW_ZOOM = 0.42;
+let floatParams = new Map(), edgeGeo = [], floatAnims = new Map(), floatAmp = 0;
+let floatTimer = 0, floatOn = false, zoomChangedAt = 0, linksMoved = false, cullTimer = 0;
+function prepareFloat() {
+  floatParams = new Map();
+  for (const n of view.nodes.values()) {
+    const h = hashCode(n.code);
+    floatParams.set(n.code, {
+      wave: n.x * 0.0042 + n.y * 0.0021,                 // shared wave: neighbours move together
+      k1: 2 + (h % 2), k2: 1 + ((h >>> 3) % 2),           // per-card wobble harmonics
+      p1: ((h >>> 5) % 628) / 100, p2: ((h >>> 13) % 628) / 100,
+    });
+  }
+  // split each path into literal text and numbers; the first two points belong to the
+  // source card's end, the last two to the target card's end
+  edgeGeo = view.edges.map(e => {
+    const parts = e.d.split(/(-?\d+(?:\.\d+)?)/);
+    const nums = [];
+    for (let i = 1; i < parts.length; i += 2) nums.push(+parts[i]);
+    return { parts, nums, from: e.from, to: e.to };
+  });
+}
+// offset of a card at cycle position u ∈ [0, 1)
+function floatAt(f, u, amp) {
+  const a = 2 * Math.PI * u;
+  return [amp * 0.35 * Math.sin(a * f.k2 + f.p2), amp * (0.65 * Math.sin(a - f.wave) + 0.35 * Math.sin(a * f.k1 + f.p1))];
+}
+// a touch more travel when zoomed out, so the sheet never looks frozen
+const wantedAmp = () => Math.min(7, 3.4 / Math.sqrt(Math.max(zoom, 0.15))) * (reduceMotion ? 0.5 : 1);
+function floatCard(code, el) {
+  const f = floatParams.get(code);
+  if (!f) return;
+  const frames = [];
+  for (let i = 0; i <= FLOAT_STEPS; i++) {
+    const [dx, dy] = floatAt(f, i / FLOAT_STEPS, floatAmp);
+    frames.push({ transform: `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0)` });
+  }
+  const anim = el.animate(frames, { duration: FLOAT_MS, iterations: Infinity, easing: "linear" });
+  anim.startTime = 0; // every card on the same clock as the link ends
+  floatAnims.set(code, anim);
+  el.classList.add("fl");
+}
+// animate the cards in (or near) the visible part of the sheet, and only those
+function cullFloat(rebuild = false) {
+  if (!floatOn || !view) return;
+  if (rebuild) { stopCardFloat(); floatAmp = wantedAmp(); }
+  const vpEl = $("#viewport");
+  const m = 0.12; // a little margin on every side
+  const x0 = (vpEl.scrollLeft - m * vpEl.clientWidth) / zoom, x1 = (vpEl.scrollLeft + (1 + m) * vpEl.clientWidth) / zoom;
+  const y0 = (vpEl.scrollTop - m * vpEl.clientHeight) / zoom, y1 = (vpEl.scrollTop + (1 + m) * vpEl.clientHeight) / zoom;
+  for (const [code, el] of cardEls) {
+    const n = view.nodes.get(code);
+    const near = n && n.x + n.w > x0 && n.x < x1 && n.y + n.h > y0 && n.y < y1;
+    if (near && !floatAnims.has(code)) floatCard(code, el);
+    else if (!near && floatAnims.has(code)) { floatAnims.get(code).cancel(); floatAnims.delete(code); el.classList.remove("fl"); }
+  }
+}
+function scheduleCull() { clearTimeout(cullTimer); cullTimer = setTimeout(() => cullFloat(), 120); }
+function stopCardFloat() {
+  for (const a of floatAnims.values()) a.cancel();
+  floatAnims.clear();
+  for (const el of cardEls.values()) el.classList.remove("fl");
+}
+function movedPath(g, off) {
+  const a = off.get(g.from) || [0, 0], b = off.get(g.to) || [0, 0];
+  const n = g.nums.length, out = g.parts.slice();
+  for (let k = 0; k < n; k++) {
+    const o = k >= n - 4 ? b : k < 4 ? a : null;
+    if (o) out[2 * k + 1] = (g.nums[k] + o[k % 2]).toFixed(1);
+  }
+  return out.join("");
+}
+function resetLinks() {
+  if (!linksMoved || !view) return;
+  linksMoved = false;
+  for (const el of edgeEls) el.setAttribute("d", view.edges[+el.dataset.i].d);
+  for (const el of $("#edgesFlow").children) el.setAttribute("d", view.edges[+el.dataset.i].d);
+}
+// A plain timer, not requestAnimationFrame: a rAF loop makes the browser service every
+// card animation on the main thread each frame, even on frames where it does nothing.
+function floatTick() {
+  floatTimer = setTimeout(floatTick, zoom < LINKS_FOLLOW_ZOOM ? 400 : 40);
+  const now = performance.now();
+  if (!view) return;
+  // after zooming settles, retune the travel distance
+  if (now - zoomChangedAt > 400 && !zAnim && Math.abs(wantedAmp() - floatAmp) / floatAmp > 0.3) cullFloat(true);
+  if (zoom < LINKS_FOLLOW_ZOOM) { resetLinks(); return; }
+  const u = ((document.timeline.currentTime || now) % FLOAT_MS) / FLOAT_MS;
+  const off = new Map();
+  for (const code of floatAnims.keys()) off.set(code, floatAt(floatParams.get(code), u, floatAmp));
+  const move = el => {
+    const g = edgeGeo[+el.dataset.i];
+    if (off.has(g.from) || off.has(g.to)) el.setAttribute("d", movedPath(g, off));
+  };
+  for (const el of edgeEls) move(el);
+  for (const el of $("#edgesFlow").children) move(el);
+  linksMoved = true;
+}
+// (re)start after every chart render, or stop when motion is off / nothing is loaded
+function syncFloat() {
+  const want = motionOn() && !!view;
+  if (want) {
+    if (!floatOn) { floatOn = true; floatTimer = setTimeout(floatTick, 0); }
+    linksMoved = true; // fresh paths after a render
+    cullFloat(true);
+  } else if (floatOn || floatAnims.size) {
+    floatOn = false;
+    clearTimeout(floatTimer);
+    stopCardFloat();
+    resetLinks();
+  }
+}
 
 function renderChart() {
   const before = view ? new Map([...view.nodes].map(([c, n]) => [c, { x: n.x, y: n.y }])) : null;
@@ -478,7 +599,7 @@ function renderChart() {
     const p = nodes.get(c.code);
     const h = hashCode(c.code);
     const fresh = !before || !before.has(c.code);
-    const drift = `--dd:${(5.5 + (h % 45) / 10).toFixed(1)}s;--dl:-${((h >>> 8) % 80) / 10}s${fresh ? `;--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : ""}`;
+    const drift = `--sd:${(9 + (h % 70) / 10).toFixed(1)}s;--sdl:-${((h >>> 8) % 160) / 10}s${fresh ? `;--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : ""}`;
     return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${drift}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="marks"></span></button>`;
   }).join("");
   cardEls = new Map($$("#cards .card").map(el => [el.dataset.code, el]));
@@ -489,7 +610,7 @@ function renderChart() {
       const o = before.get(code), n = nodes.get(code);
       if (!o || (o.x === n.x && o.y === n.y)) continue;
       moved = true;
-      el.animate([{ transform: `translate(${o.x - n.x}px, ${o.y - n.y}px)` }, { transform: "none" }], { duration: 650, easing: "cubic-bezier(.2, .8, .2, 1)" });
+      el.animate([{ translate: `${o.x - n.x}px ${o.y - n.y}px` }, { translate: "0px 0px" }], { duration: 650, easing: "cubic-bezier(.2, .8, .2, 1)" });
     }
     if (moved) {
       svg.classList.add("settling");
@@ -497,9 +618,11 @@ function renderChart() {
       renderChart.t = setTimeout(() => svg.classList.remove("settling"), 420);
     }
   }
+  prepareFloat();
   sizeWorld();
   renderColhead();
   applyHighlight();
+  syncFloat();
 }
 
 function renderColhead() {
@@ -538,6 +661,8 @@ function sizeWorld() {
   $("#sizer").style.width = Math.ceil(view.width * zoom + ins.r) + "px";
   $("#sizer").style.height = Math.ceil(view.height * zoom + ins.b) + "px";
   $("#zPct").textContent = Math.round(zoom * 100) + "%";
+  zoomChangedAt = performance.now();
+  scheduleCull();
 }
 // anchor: point in viewport client coordinates that stays put
 function setZoom(z, anchor) {
@@ -682,6 +807,8 @@ function applyHighlight() {
     else if (matches) cls += matches.has(code) ? " is-match" : " is-dim";
     else if (trees.any) cls += tc ? " is-hl" + (trees.roots.has(code) ? " is-root" : "") : state.dimOthers ? " is-dim" : "";
     if (code === state.selected) cls += " is-selected";
+    if (el.classList.contains("rise")) cls += " rise"; // keep the entrance and float state
+    if (el.classList.contains("fl")) cls += " fl";
     if (el.className !== cls) el.className = cls;
     const hc = tc ? `var(--h${tc[0]})` : "";
     if (el.style.getPropertyValue("--hc") !== hc) { if (hc) el.style.setProperty("--hc", hc); else el.style.removeProperty("--hc"); }
@@ -722,7 +849,7 @@ function renderFlows(flows) {
   if (key === flowKey) return;
   flowKey = key;
   $("#edgesFlow").innerHTML = flows.slice(0, 160).map(([i, color]) =>
-    `<path class="flow" d="${view.edges[i].d}" style="stroke:${color};animation-delay:-${(hashCode(String(i)) % 16) / 10}s"></path>`).join("");
+    `<path class="flow" data-i="${i}" d="${view.edges[i].d}" style="stroke:${color};animation-delay:-${(hashCode(String(i)) % 16) / 10}s"></path>`).join("");
 }
 
 function renderReadout(focus, anc, desc) {
@@ -870,7 +997,7 @@ function render() {
   $("#viewport").hidden = !has;
   $("#colhead").hidden = !has;
   if (has) renderChart();
-  else { view = null; $("#readout").hidden = true; renderColhead(); }
+  else { view = null; $("#readout").hidden = true; renderColhead(); syncFloat(); }
   renderTrees();
   renderDetails();
 }
@@ -1298,9 +1425,9 @@ function buildImageSpec(o) {
       chrome.push({ t: "path", d: `M${x},${titleH} V${top}`, stroke: major ? P.rule : P.rule2, sw: 1, dash: major ? null : [4, 4] });
     }
     const l = labels[k], lx = X(lay.colX(k));
-    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.main, size: 13.5, weight: 700, family: "code", color: P.ink });
-    chrome.push({ t: "text", x: lx + PFImage.measure(l.main, 13.5, 700, "code") + 8, y: titleH + 25, text: lay.mode === "semester" ? `${l.band.toLowerCase()} · ${l.sub}` : l.sub, size: 11, family: "note", color: P.ink3 });
-    chrome.push({ t: "text", x: lx + D.colW, y: titleH + 25, text: String(l.n), size: 11, family: "code", color: P.ink3, anchor: "end" });
+    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.main, size: 13.5, weight: 700, color: P.ink });
+    chrome.push({ t: "text", x: lx + PFImage.measure(l.main, 13.5, 700) + 8, y: titleH + 25, text: lay.mode === "semester" ? `${l.band.toLowerCase()} · ${l.sub}` : l.sub, size: 11, color: P.ink3 });
+    chrome.push({ t: "text", x: lx + D.colW, y: titleH + 25, text: String(l.n), size: 11, color: P.ink3, anchor: "end" });
   }
   chrome.push({ t: "path", d: `M0,${top - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
 
@@ -1328,9 +1455,9 @@ function buildImageSpec(o) {
     ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: P.card, a });
     if (hc) ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: hc, a: 0.1 });
     ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, stroke: hc || P.rule, sw: trees.roots.has(c.code) ? 2.2 : 1, a });
-    ops.push({ t: "text", x: x + 10, y: y + 19, text: c.code, size: 12.5, weight: 700, family: "code", color: hc || P.ink, a });
-    if (c.programs.length > 1) ops.push({ t: "text", x: x + n.w - 10, y: y + 19, text: `×${c.programs.length}`, size: 10.5, family: "code", color: P.ink3, anchor: "end", a });
-    PFImage.wrap(c.name, n.w - 20, 11.5, 450, 2, "text").forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11.5, weight: 450, family: "text", color: P.ink2, a }));
+    ops.push({ t: "text", x: x + 10, y: y + 19, text: c.code, size: 12.5, weight: 700, color: hc || P.ink, a });
+    if (c.programs.length > 1) ops.push({ t: "text", x: x + n.w - 10, y: y + 19, text: `×${c.programs.length}`, size: 10.5, color: P.ink3, anchor: "end", a });
+    PFImage.wrap(c.name, n.w - 20, 11, 400, 2).forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11, color: P.ink2, a }));
     if (tc) tc.forEach((ci, i) => ops.push({ t: "rect", x: x + n.w - 6 - 10 * (tc.length - i), y: y + n.h - 12, w: 7, h: 7, r: 3.5, fill: P.h[ci] }));
   }
   ops.push(...chrome);
@@ -1343,21 +1470,21 @@ function buildImageSpec(o) {
     ops.push({ t: "rect", x: 0, y: 0, w: W, h: titleH, fill: P.head });
     ops.push({ t: "path", d: `M0,${titleH - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
     const pre = "PREREQ", sl = "/";
-    ops.push({ t: "text", x: D.padL, y: 32, text: pre, size: 21, weight: 800, family: "ui", color: P.ink, ls: 1 });
-    const x1 = D.padL + PFImage.measure(pre, 21, 800, "ui") + 7;
-    ops.push({ t: "text", x: x1, y: 32, text: sl, size: 21, weight: 500, family: "ui", color: P.accent });
-    ops.push({ t: "text", x: x1 + PFImage.measure(sl, 21, 500, "ui") + 1, y: 32, text: "FLOW", size: 21, weight: 800, family: "ui", color: P.ink, ls: 1 });
-    ops.push({ t: "text", x: D.padL, y: 54, text: `${prog} · ${what}`, size: 13.5, weight: 500, family: "text", color: P.ink2 });
-    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")} · ${today()}`, size: 11.5, family: "note", color: P.ink3 });
+    ops.push({ t: "text", x: D.padL, y: 32, text: pre, size: 19, weight: 700, color: P.ink, ls: 3 });
+    const x1 = D.padL + PFImage.measure(pre, 19, 700) + 6 * 3;
+    ops.push({ t: "text", x: x1, y: 32, text: sl, size: 19, color: P.accent });
+    ops.push({ t: "text", x: x1 + PFImage.measure(sl, 19) + 3, y: 32, text: "FLOW", size: 19, weight: 700, color: P.ink, ls: 3 });
+    ops.push({ t: "text", x: D.padL, y: 54, text: `${prog} · ${what}`, size: 12.5, color: P.ink2 });
+    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")} · ${today()}`, size: 11.5, color: P.ink3 });
     // credit badge, top right
     const by = "made by areeb";
-    const bw = Math.max(PFImage.measure(by, 16, 700, "ui"), PFImage.measure(SITE, 13, 400, "code")) + 32;
+    const bw = Math.max(PFImage.measure(by, 16, 700), PFImage.measure(SITE, 13, 400)) + 32;
     if (W - bw - D.padR > 360) {
       const bx = W - D.padR - bw, byy = 16;
       ops.push({ t: "rect", x: bx, y: byy, w: bw, h: 54, r: 12, fill: P.accent, a: 0.12 });
       ops.push({ t: "rect", x: bx, y: byy, w: bw, h: 54, r: 12, stroke: P.accent, sw: 1.2, a: 0.7 });
-      ops.push({ t: "text", x: bx + 16, y: byy + 23, text: by, size: 16, weight: 700, family: "ui", color: P.ink });
-      ops.push({ t: "text", x: bx + 16, y: byy + 42, text: SITE, size: 13, family: "code", color: P.accent });
+      ops.push({ t: "text", x: bx + 16, y: byy + 23, text: by, size: 16, weight: 700, color: P.ink });
+      ops.push({ t: "text", x: bx + 16, y: byy + 42, text: SITE, size: 13, color: P.accent });
     }
   }
 
@@ -1365,17 +1492,17 @@ function buildImageSpec(o) {
   const fy = H - footH, ly = fy + footH / 2 + 4;
   ops.push({ t: "rect", x: 0, y: fy, w: W, h: footH, fill: P.head });
   ops.push({ t: "path", d: `M0,${fy + 0.5} H${W}`, stroke: P.rule2, sw: 1 });
-  const creditW = PFImage.measure("made by areeb · ", 12.5, 700, "ui") + PFImage.measure(SITE, 12.5, 400, "code");
-  ops.push({ t: "text", x: W - D.padR - PFImage.measure(SITE, 12.5, 400, "code"), y: ly, text: SITE, size: 12.5, family: "code", color: P.accent });
-  ops.push({ t: "text", x: W - D.padR - creditW, y: ly, text: "made by areeb · ", size: 12.5, weight: 700, family: "ui", color: P.ink2 });
+  const creditW = PFImage.measure("made by areeb · ", 12.5, 700) + PFImage.measure(SITE, 12.5, 400);
+  ops.push({ t: "text", x: W - D.padR - PFImage.measure(SITE, 12.5, 400), y: ly, text: SITE, size: 12.5, color: P.accent });
+  ops.push({ t: "text", x: W - D.padR - creditW, y: ly, text: "made by areeb · ", size: 12.5, weight: 700, color: P.ink2 });
   if (o.title) {
     let lx = D.padL;
     const room = W - D.padR - creditW - 24;
     const item = (draw, text) => {
-      const w = 34 + PFImage.measure(text, 11.5, 400, "note");
+      const w = 34 + PFImage.measure(text, 11.5, 400);
       if (lx + w > room) return;
       draw(lx); lx += 34;
-      ops.push({ t: "text", x: lx, y: ly, text, size: 11.5, family: "note", color: P.ink3 });
+      ops.push({ t: "text", x: lx, y: ly, text, size: 11.5, color: P.ink3 });
       lx += w - 34 + 24;
     };
     item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.5 }), "required");
@@ -1403,7 +1530,7 @@ async function runImageExport() {
     if (o.format === "svg") {
       const fonts = await fontData();
       saveBlob(new Blob([PFImage.toSVG(spec, fonts)], { type: "image/svg+xml;charset=utf-8" }), base + ".svg");
-      showToast(`Downloaded ${esc(base)}.svg${fonts.length ? "" : " · fonts not embedded (open the page over http to embed them)"}`, 5000);
+      showToast(`Downloaded ${esc(base)}.svg${fonts.length ? "" : " · font not embedded (open the page over http to embed mononoki)"}`, 5000);
     } else {
       const res = await PFImage.toPNG(spec, o.scale);
       saveBlob(res.blob, base + ".png");
@@ -1427,7 +1554,7 @@ async function fontData() {
       const buf = new Uint8Array(await (await fetch(f.url)).arrayBuffer());
       let s = "";
       for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-      return { family: f.family, weight: f.weight, style: f.style, base64: btoa(s) };
+      return { weight: f.weight, base64: btoa(s) };
     }));
   } catch (e) { fontCache = []; }
   return fontCache;
@@ -1474,6 +1601,7 @@ function centreCourse() {
 function setMotion(on, remember = true) {
   if (on) delete document.documentElement.dataset.motion; else document.documentElement.dataset.motion = "off";
   $("#zMotion").setAttribute("aria-pressed", String(on));
+  syncFloat();
   if (remember) try { localStorage.setItem("prereqflow.motion", on ? "on" : "off"); } catch (e) { /* not remembered */ }
 }
 function setTheme(t, remember = true) {
@@ -1583,6 +1711,7 @@ cards.addEventListener("pointerover", e => {
   const code = c ? c.dataset.code : null;
   if (code !== state.hovered) { state.hovered = code; applyHighlight(); }
 });
+cards.addEventListener("animationend", e => { if (e.animationName === "rise") e.target.classList.remove("rise"); });
 cards.addEventListener("pointerleave", () => { if (state.hovered) { state.hovered = null; applyHighlight(); } });
 cards.addEventListener("click", e => {
   if (suppressClick) { suppressClick = false; return; }
@@ -1618,7 +1747,7 @@ $("#zPct").addEventListener("click", () => zoomBy(1 / zoom));
 $("#zMotion").addEventListener("click", () => setMotion(document.documentElement.dataset.motion === "off"));
 $("#zFit").addEventListener("click", () => fitAll());
 const vp = $("#viewport");
-vp.addEventListener("scroll", () => requestAnimationFrame(renderColhead), { passive: true });
+vp.addEventListener("scroll", () => { requestAnimationFrame(renderColhead); scheduleCull(); }, { passive: true });
 // The wheel zooms around the pointer. Shift+wheel keeps the browser's own sideways
 // scroll; a sideways trackpad swipe pans; a trackpad pinch (ctrl+wheel) zooms finer.
 vp.addEventListener("wheel", e => {
@@ -1788,7 +1917,7 @@ document.addEventListener("keydown", e => {
 });
 
 setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark", false);
-setMotion(document.documentElement.dataset.motion !== "off" && !reduceMotion, false);
+setMotion(document.documentElement.dataset.motion !== "off", false);
 render();
 openWelcome();
 })();

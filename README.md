@@ -36,8 +36,8 @@ python3 -m http.server 8080      # or: npm run serve
 ```
 
 You can also open `index.html` directly from disk. Everything works that way except
-embedding the fonts into SVG exports, because browsers block `fetch()` on `file://`
-(the SVG then falls back to the fonts installed on the viewer's system).
+embedding the font into SVG exports, because browsers block `fetch()` on `file://`
+(the SVG then falls back to the viewer's monospace font).
 
 ## Using it
 
@@ -114,11 +114,19 @@ out of a PDF. Each course ends up on its own row and is checked as you type.
 
 ### Motion
 
-Cards drift gently, each on its own rhythm, and a soft light moves slowly behind the
-sheet. Traced and highlighted links carry small particles that flow towards the
-course they unlock. When you switch layouts or programs, cards glide to their new
-places. The **motion** button in the zoom bar turns all of this off. It also stays
-off if your system asks for reduced motion.
+The sheet is never still:
+
+- Every course card floats on a slow wave that ripples across the sheet, plus a small
+  wobble of its own. Links stay attached to the cards as they move.
+- A soft sheen sweeps across each card from time to time, and a faint light moves
+  slowly behind the sheet.
+- Traced and highlighted links carry small particles that flow towards the course
+  they unlock.
+- Cards fade in when a sheet loads and glide to their new places when you switch
+  layouts or programs.
+
+The **motion** button in the zoom bar turns all of this off. If your system asks for
+reduced motion, cards still float, at half the distance.
 
 ### Tree highlights
 
@@ -156,7 +164,7 @@ js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
 js/app.js                     state, import, rendering, zoom, highlights, export
 data/*.json                   built-in Ontario Tech data (PrereqFlow export format)
 data/*.js                     the same data wrapped for <script> loading (generated)
-assets/fonts/                 mononoki, Recursive Casual, Victor Mono (all SIL OFL)
+assets/fonts/                 mononoki (SIL Open Font License)
 scripts/build-data.js         regenerates data/*.js from data/*.json
 tests/                        node:test suites for the parser and layout
 ```
@@ -200,21 +208,21 @@ Both views use a Sugiyama-style layered graph drawing:
 The tests check the free-flow guarantee (prerequisites strictly left) against all 16
 programs, the combined view, and data containing corequisites and cycles.
 
-### Look and type
+### Look
 
 There are two sheets, night (dark) and paper (light). Both use warm neutrals instead
 of pure black and white, one periwinkle/apricot pair for tracing needs/unlocks, and
-six pastel hues for tree highlights. All type is built around mononoki:
+six pastel hues for tree highlights. All text is set in mononoki.
 
-| Typeface | Used for |
-| --- | --- |
-| mononoki | course codes, counts, numbers, data |
-| Recursive Mono Casual | wordmark, headings, buttons |
-| Recursive Casual (sans) | course names and body text |
-| Victor Mono Italic | hints, annotations, legends |
+### Ambient motion
 
-The two Recursive files are fixed "casual" instances cut from the variable font
-(CASL = 1), so the same faces also work in canvas image exports.
+Each card runs a Web Animations float (a sum of whole-number harmonics of one 11 s
+cycle, sampled into keyframes) pinned to the document clock, so the browser's
+compositor moves the cards without layout work. A light timer reads the same clock
+and shifts only the end points of each link, which keeps links attached to their
+cards; the lanes between columns stay put. To keep it cheap, only cards in or near
+the visible area float, and when zoomed far out (where the float is about a pixel on
+screen) link ends stop following.
 
 ### Zoom
 
@@ -251,10 +259,8 @@ JSON, replace `data/ontario-tech-engineering-2026-2027.json` and run
 ## Credits
 
 - Made by **areeb**: [areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/).
-- Typefaces, all under the SIL Open Font License 1.1 (licenses in `assets/fonts/`):
-  [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
-  [Recursive](https://github.com/arrowtype/recursive) by Arrow Type,
-  [Victor Mono](https://github.com/rubjo/victor-mono-font) by Rune Bjørnerås.
+- Typeface: [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
+  SIL Open Font License 1.1 (`assets/fonts/OFL-mononoki.txt`).
 - PDF reading: [pdf.js](https://mozilla.github.io/pdf.js/), loaded from a CDN only
   when a PDF is imported.
 - Course data: Ontario Tech University program maps, 2026–2027. Always check the
