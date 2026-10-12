@@ -118,15 +118,26 @@ The sheet is never still:
 
 - Every course card floats on a slow wave that ripples across the sheet, plus a small
   wobble of its own. Links stay attached to the cards as they move.
-- A soft sheen sweeps across each card from time to time, and a faint light moves
-  slowly behind the sheet.
+- A soft sheen sweeps across each card from time to time, and a faint light and a
+  field of stars drift slowly behind the sheet.
 - Traced and highlighted links carry small particles that flow towards the course
   they unlock.
 - Cards fade in when a sheet loads and glide to their new places when you switch
   layouts or programs.
 
-The **motion** button in the zoom bar turns all of this off. If your system asks for
-reduced motion, cards still float, at half the distance.
+The **motion** button in the zoom bar turns all of this off (it's the same switch as
+**Animations** in the settings menu, so it applies to all three sites). If your system
+asks for reduced motion, cards still float, at half the distance.
+
+### Themes and settings
+
+The gear icon at the top right opens the settings shared by
+[areeb-ece.github.io](https://areeb-ece.github.io/), PrereqFlow and
+[OTU Calendar](https://areeb-ece.github.io/otucalendar/): a theme (Night, Paper, Void,
+Console, Amber and more, or follow the system), an accent colour, corner style, motion,
+and the night sky behind the sheet (number of stars, size, brightness, blur, colour,
+drift speed and direction, glow). Choices are saved in your browser and apply on all
+three sites.
 
 ### Tree highlights
 
@@ -146,7 +157,8 @@ session.
 - **Resolution**: 2×, 3×, 4× or 6× PNG. The scale steps down automatically if it
   would exceed the browser's canvas limits. **SVG** gives a vector copy with the font
   embedded.
-- **Dark** or **light / print** sheet, with an optional title block and legend.
+- **Current theme**, **dark** or **light / print** sheet, with an optional title block
+  and legend.
 - Every image carries a credit (`made by areeb · areeb-ece.github.io/prereqflow`),
   shown as a badge in the title block and in the footer.
 
@@ -157,7 +169,8 @@ into PrereqFlow, so a JSON export is also how you save and share a plan.
 
 ```
 index.html                    page shell: toolbar, chart stage, dialogs
-css/style.css                 soft drafting-sheet theme (night + paper), motion
+css/style.css                 soft drafting-sheet theme (night + paper fallback), motion
+js/theme.js                   offline fallback: remembered light/dark sheet and motion
 js/parser.js        PF        course text / PDF table → course records
 js/layout.js        PFLayout  course records → card positions + routed links
 js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
@@ -210,16 +223,20 @@ programs, the combined view, and data containing corequisites and cycles.
 
 ### Look
 
-There are two sheets, night (dark) and paper (light). Both use warm neutrals instead
-of pure black and white, one periwinkle/apricot pair for tracing needs/unlocks, and
-six pastel hues for tree highlights. All text is set in mononoki.
+The default sheets, night (dark) and paper (light), use warm neutrals instead of pure
+black and white, one periwinkle/apricot pair for tracing needs/unlocks, and six pastel
+hues for tree highlights. All text is set in mononoki.
 
-The colours come from the master palette shared with
+The colours and themes come from the master palette shared with
 [areeb-ece.github.io](https://areeb-ece.github.io/) and OTU Calendar:
-`/design/tokens.css`, kept in the portfolio repo at `public/design/tokens.css`. The page
-loads it after `css/style.css`, so changing it there restyles all three sites. The values
-in `css/style.css` are a fallback for when the page is opened offline or from disk, and
-image export reads the master palette too.
+`/design/tokens.css`, kept in the portfolio repo under `public/design/` along with the
+settings panel and night sky (`ui.js`, `ui.css`) and the script that applies saved
+settings before the page paints (`theme.js`). The page loads them after `css/style.css`,
+so changing them there restyles all three sites. For themes other than night and paper,
+the chart's own colours (links, needs/unlocks) are derived from the theme's in
+`css/style.css`. Offline or from disk, those files can't load: the page falls back to
+the night/paper values in `css/style.css` and a light/dark button. Image export reads
+the current theme, or the master palette's night or paper sheet.
 
 ### Ambient motion
 
@@ -249,7 +266,8 @@ renders it either to a `<canvas>` at the chosen scale or to SVG.
 ### Storage
 
 The session (courses, layout mode, filter and highlights) is saved in `localStorage`
-in your browser only. Nothing is uploaded anywhere.
+in your browser only, and so are the display settings (shared with the other sites on
+areeb-ece.github.io). Nothing is uploaded anywhere.
 
 ## Development
 

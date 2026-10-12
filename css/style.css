@@ -52,7 +52,7 @@
   --card-hover: #FFFDF8;
   --ink: #2F2D36;
   --ink-2: #5D5967;
-  --ink-3: #8A8592;
+  --ink-3: #6E6A76;
   --ink-4: #B5B0B9;
   --rule: #DDD7CB;
   --rule-2: #E8E3D9;
@@ -78,6 +78,18 @@
   --shadow-pop: 0 20px 50px -20px rgba(47, 45, 54, 0.35), 0 2px 6px rgba(47, 45, 54, 0.08);
   --h0: #3F8D5B; --h1: #7A58C4; --h2: #C65A45; --h3: #A9831B; --h4: #2B8A84; --h5: #B6508A;
   color-scheme: light;
+}
+
+/* The master palette's other themes (/design/tokens.css) define only the shared colours;
+   the chart's own colours follow from them. /design/theme.js sets data-scheme. */
+:root[data-theme]:not([data-theme="dark"]):not([data-theme="light"]) {
+  --zone-alt: color-mix(in srgb, var(--accent) 3%, transparent);
+  --edge: color-mix(in srgb, var(--ink-4) 75%, var(--sheet-2));
+  --edge-dim: color-mix(in srgb, var(--rule-2) 75%, var(--sheet-2));
+  --needs: var(--c0);
+  --needs-soft: color-mix(in srgb, var(--c0) 14%, var(--card));
+  --unlocks: var(--c2);
+  --unlocks-soft: color-mix(in srgb, var(--c2) 14%, var(--card));
 }
 
 * { box-sizing: border-box; }
@@ -166,6 +178,9 @@ select.ctl { height: 32px; border: 1px solid var(--rule); border-radius: var(--r
   animation: aurora 38s ease-in-out infinite alternate;
 }
 @keyframes aurora { 0% { transform: translate(-4%, -3%) scale(1); } 50% { transform: translate(5%, 2%) scale(1.08); } 100% { transform: translate(-2%, 5%) scale(1.02); } }
+/* the shared night sky (/design/ui.js) is drawn behind the sheet instead, haze included */
+.has-sky .stage::before { display: none; }
+.design-slot { display: contents; }
 .colhead { position: relative; flex: none; height: 46px; background: color-mix(in srgb, var(--sheet) 88%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--rule-2); overflow: hidden; }
 .colhead .band { position: absolute; top: 0; height: 18px; display: flex; align-items: center; justify-content: center; font: 400 10px var(--f); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule-2); white-space: nowrap; overflow: hidden; }
 .colhead .ch { position: absolute; top: 18px; height: 28px; display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
