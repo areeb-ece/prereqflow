@@ -4,22 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PrereqFlow</title>
-<meta name="description" content="Course prerequisite flowcharts. Ships with all 16 Ontario Tech engineering program maps (2026-2027); import your own courses as text, JSON or CSV.">
+<meta name="description" content="Course prerequisite flowcharts by areeb. Ships with all 16 Ontario Tech engineering program maps (2026-2027); import your own courses as text, JSON or CSV.">
+<meta name="author" content="areeb">
+<link rel="canonical" href="https://areeb-ece.github.io/prereqflow/">
 <link rel="preload" href="assets/fonts/mononoki-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/mononoki-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/recursive-mono-casual.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/recursive-casual.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
-<script>try { const t = localStorage.getItem("prereqflow.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<script>try { const t = localStorage.getItem("prereqflow.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; if (localStorage.getItem("prereqflow.motion") === "off") document.documentElement.dataset.motion = "off"; } catch (e) {}</script>
 </head>
 <body>
 <div class="app" id="app">
   <header class="bar">
     <div class="brand">
-      <div class="wordmark">PREREQ<span>/</span>FLOW</div>
+      <div class="wordmark"><b>PREREQ<span>/</span>FLOW</b><a href="https://areeb-ece.github.io/prereqflow/" target="_blank" rel="noopener">by areeb</a></div>
       <div class="sheetinfo" id="sheetInfo">NO COURSES LOADED</div>
     </div>
     <div class="tools">
       <div class="search" id="searchWrap" hidden>
-        <input id="search" type="search" placeholder="find course  [/]" autocomplete="off" spellcheck="false" aria-label="Find a course by code or name">
+        <input id="search" type="search" placeholder="find a course…" title="Find a course  [/]" autocomplete="off" spellcheck="false" aria-label="Find a course by code or name">
         <span class="count" id="searchCount"></span>
       </div>
       <select class="ctl" id="programFilter" aria-label="Show courses from" hidden></select>
@@ -51,7 +55,7 @@
       <span class="k"><svg viewBox="0 0 26 8" aria-hidden="true"><path d="M1 4h24" stroke="var(--ink-2)" stroke-width="1.4" stroke-dasharray="4 3"/></svg>either / or</span>
       <span class="k" id="legendProg" hidden><b>×3</b>&nbsp;in 3 programs</span>
     </div>
-    <span class="hint" id="hint">hover: trace · click: pin · shift+click: highlight tree · dbl-click: edit · ctrl+wheel: zoom · shift+drag: zoom to area</span>
+    <span class="hint" id="hint">scroll to zoom · drag to pan · hover to trace · click to pin · shift+click to highlight a tree · shift+drag to zoom into an area · double-click to edit</span>
     <div class="trees" id="trees" hidden></div>
   </div>
 
@@ -65,6 +69,7 @@
             <defs id="markers"></defs>
             <g id="edgesBase"></g>
             <g id="edgesHi"></g>
+            <g id="edgesFlow"></g>
           </svg>
           <div class="cards" id="cards"></div>
         </div>
@@ -75,9 +80,12 @@
       <button type="button" id="zOut" aria-label="Zoom out" title="Zoom out  [-]">−</button>
       <button type="button" class="pct" id="zPct" title="Actual size  [1]">100%</button>
       <button type="button" id="zIn" aria-label="Zoom in" title="Zoom in  [+]">+</button>
-      <button type="button" id="zFit" title="Fit to screen  [0]">FIT</button>
+      <button type="button" id="zFit" title="Fit to screen  [0]">fit</button>
+      <span class="div"></span>
+      <button type="button" id="zMotion" aria-pressed="true" title="Ambient motion on / off">motion</button>
     </div>
     <div class="readout" id="readout" hidden></div>
+    <div class="credit" id="credit" hidden>made by areeb · <a href="https://areeb-ece.github.io/prereqflow/" target="_blank" rel="noopener">areeb-ece.github.io/prereqflow</a></div>
     <aside class="details" id="details" hidden aria-label="Course details"></aside>
     <div class="empty" id="empty" hidden>
       <div>
@@ -98,7 +106,7 @@
   <div class="dialog welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <div class="tb">
       <div>
-        <h1 id="welcomeTitle">PREREQ/FLOW</h1>
+        <h1 id="welcomeTitle">PREREQ<span>/</span>FLOW</h1>
         <p>Course prerequisite flowcharts: every prerequisite drawn as a link, traced on hover.</p>
       </div>
       <div><span class="lbl">sheet</span><span id="wDate" class="mono"></span></div>
@@ -126,6 +134,10 @@
     <div class="resume" id="wResume" hidden>
       <button class="btn" type="button" id="wResumeBtn">Resume last session</button>
       <span id="wResumeInfo"></span>
+    </div>
+    <div class="wfoot">
+      <span class="by">made by areeb <i>· for planning, not official advising</i></span>
+      <a href="https://areeb-ece.github.io/prereqflow/" target="_blank" rel="noopener">areeb-ece.github.io/prereqflow</a>
     </div>
   </div>
 </div>
@@ -235,7 +247,7 @@
           </div>
         </fieldset>
       </div>
-      <label class="check"><input type="checkbox" id="imgTitle" checked>Title block and legend</label>
+      <label class="check"><input type="checkbox" id="imgTitle" checked>Title block and legend <span class="hint">(the credit line is always included)</span></label>
       <label class="check"><input type="checkbox" id="imgHl" checked>Keep tree highlights</label>
       <p class="dims" id="imgDims"></p>
     </form>

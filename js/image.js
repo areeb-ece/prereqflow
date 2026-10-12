@@ -2,34 +2,51 @@
  * high-resolution canvas (PNG) or to a standalone SVG document.
  *
  * spec = { width, height, bg, ops: [...] } in CSS pixels, where each op is one of
- *   { t: "rect",  x, y, w, h, fill?, stroke?, sw?, dash? }
- *   { t: "path",  d, stroke, sw?, dash?, fill? }          d is SVG path data
- *   { t: "arrow", x, y, dir, color, size? }               tip at (x, y), dir ±1
- *   { t: "text",  x, y, text, size, weight?, color, anchor?, ls? }   y = baseline
- * and may carry `a` (opacity, 0–1).
+ *   { t: "rect",  x, y, w, h, r?, fill?, stroke?, sw?, dash? }   r = corner radius
+ *   { t: "path",  d, stroke, sw?, dash?, fill? }                 d is SVG path data
+ *   { t: "arrow", x, y, dir, color, size? }                      tip at (x, y), dir ±1
+ *   { t: "text",  x, y, text, size, weight?, family?, color, anchor?, ls? }   y = baseline
+ * and may carry `a` (opacity, 0–1). family is one of the keys of FAMILIES.
  */
 const PFImage = (() => {
   "use strict";
 
-  const FONT = '"mononoki", ui-monospace, Menlo, Consolas, monospace';
+  const FAMILIES = {
+    code: { css: '"mononoki", ui-monospace, Menlo, Consolas, monospace', style: "normal" },
+    ui: { css: '"Rec Mono Casual", "mononoki", ui-monospace, monospace', style: "normal" },
+    text: { css: '"Rec Casual", "Segoe UI", system-ui, sans-serif', style: "normal" },
+    note: { css: '"Victor Mono", "mononoki", ui-monospace, monospace', style: "italic" },
+  };
+  // font files embedded into SVG exports, by family
+  const FONT_FILES = [
+    { family: "mononoki", weight: "400", style: "normal", url: "assets/fonts/mononoki-Regular.woff2" },
+    { family: "mononoki", weight: "700", style: "normal", url: "assets/fonts/mononoki-Bold.woff2" },
+    { family: "Rec Mono Casual", weight: "300 900", style: "normal", url: "assets/fonts/recursive-mono-casual.woff2" },
+    { family: "Rec Casual", weight: "300 900", style: "normal", url: "assets/fonts/recursive-casual.woff2" },
+    { family: "Victor Mono", weight: "400", style: "italic", url: "assets/fonts/victor-mono-italic.woff2" },
+  ];
   // Browsers refuse canvases past ~16k px per side; Safari also caps total area.
   const MAX_SIDE = 16000, MAX_AREA = 120e6;
 
+  const fam = k => FAMILIES[k] || FAMILIES.code;
+  const fontStr = (size, weight = 400, family = "code") => `${fam(family).style === "italic" ? "italic " : ""}${weight} ${size}px ${fam(family).css}`;
+
   let measureCtx = null;
-  function measure(text, size, weight = 400) {
+  function measure(text, size, weight = 400, family = "code") {
     if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
-    measureCtx.font = `${weight} ${size}px ${FONT}`;
+    measureCtx.font = fontStr(size, weight, family);
     return measureCtx.measureText(text).width;
   }
 
   // Word-wrap to at most maxLines lines of maxW px; the last line gets an ellipsis.
-  function wrap(text, maxW, size, weight = 400, maxLines = 2) {
+  function wrap(text, maxW, size, weight = 400, maxLines = 2, family = "code") {
     const words = String(text).split(/\s+/).filter(Boolean);
+    const fits = s => measure(s, size, weight, family) <= maxW;
     const lines = [];
     let cur = "";
     for (let i = 0; i < words.length; i++) {
       const tryLine = cur ? cur + " " + words[i] : words[i];
-      if (measure(tryLine, size, weight) <= maxW || !cur) { cur = tryLine; continue; }
+      if (fits(tryLine) || !cur) { cur = tryLine; continue; }
       lines.push(cur);
       cur = words[i];
       if (lines.length === maxLines) { cur = words.slice(i).join(" "); break; }
@@ -41,9 +58,9 @@ const PFImage = (() => {
       lines.push(rest);
     }
     const last = lines.length - 1;
-    if (last >= 0 && measure(lines[last], size, weight) > maxW) {
+    if (last >= 0 && !fits(lines[last])) {
       let s = lines[last];
-      while (s.length > 1 && measure(s + "…", size, weight) > maxW) s = s.slice(0, -1);
+      while (s.length > 1 && !fits(s + "…")) s = s.slice(0, -1);
       lines[last] = s.trimEnd() + "…";
     }
     return lines;
@@ -51,8 +68,7 @@ const PFImage = (() => {
 
   // Largest scale ≤ wanted that keeps the canvas inside browser limits.
   function fitScale(w, h, wanted) {
-    let s = wanted;
-    s = Math.min(s, MAX_SIDE / w, MAX_SIDE / h, Math.sqrt(MAX_AREA / (w * h)));
+    const s = Math.min(wanted, MAX_SIDE / w, MAX_SIDE / h, Math.sqrt(MAX_AREA / (w * h)));
     return Math.max(0.25, Math.floor(s * 100) / 100);
   }
 
@@ -60,11 +76,20 @@ const PFImage = (() => {
     const s = op.size || 7, d = op.dir || 1;
     return [[op.x, op.y], [op.x - d * s, op.y - s * 0.46], [op.x - d * s, op.y + s * 0.46]];
   }
+  function rrect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (r && ctx.roundRect) ctx.roundRect(x, y, w, h, r);
+    else ctx.rect(x, y, w, h);
+  }
+
+  async function loadFonts() {
+    if (!document.fonts || !document.fonts.load) return;
+    const wanted = [fontStr(12, 400, "code"), fontStr(12, 700, "code"), fontStr(12, 400, "ui"), fontStr(12, 700, "ui"), fontStr(12, 400, "text"), fontStr(12, 600, "text"), fontStr(12, 400, "note")];
+    try { await Promise.all(wanted.map(f => document.fonts.load(f))); } catch (e) { /* fall back to system fonts */ }
+  }
 
   async function toCanvas(spec, scale) {
-    if (document.fonts && document.fonts.load) {
-      try { await Promise.all([document.fonts.load(`400 12px ${FONT}`), document.fonts.load(`700 12px ${FONT}`)]); } catch (e) { /* fall back to system mono */ }
-    }
+    await loadFonts();
     const cv = document.createElement("canvas");
     cv.width = Math.round(spec.width * scale);
     cv.height = Math.round(spec.height * scale);
@@ -73,13 +98,17 @@ const PFImage = (() => {
     ctx.scale(scale, scale);
     ctx.fillStyle = spec.bg;
     ctx.fillRect(0, 0, spec.width, spec.height);
-    ctx.lineCap = "butt";
+    ctx.lineCap = "round";
     for (const op of spec.ops) {
       ctx.setLineDash(op.dash || []);
       ctx.globalAlpha = op.a == null ? 1 : op.a;
       if (op.t === "rect") {
-        if (op.fill) { ctx.fillStyle = op.fill; ctx.fillRect(op.x, op.y, op.w, op.h); }
-        if (op.stroke) { ctx.strokeStyle = op.stroke; ctx.lineWidth = op.sw || 1; const o = (op.sw || 1) / 2; ctx.strokeRect(op.x + o, op.y + o, op.w - 2 * o, op.h - 2 * o); }
+        if (op.fill) { ctx.fillStyle = op.fill; rrect(ctx, op.x, op.y, op.w, op.h, op.r); ctx.fill(); }
+        if (op.stroke) {
+          const o = (op.sw || 1) / 2;
+          ctx.strokeStyle = op.stroke; ctx.lineWidth = op.sw || 1;
+          rrect(ctx, op.x + o, op.y + o, op.w - 2 * o, op.h - 2 * o, op.r ? Math.max(0, op.r - o) : 0); ctx.stroke();
+        }
       } else if (op.t === "path") {
         const p = new Path2D(op.d);
         if (op.fill) { ctx.fillStyle = op.fill; ctx.fill(p); }
@@ -89,7 +118,7 @@ const PFImage = (() => {
         ctx.beginPath(); ctx.moveTo(...pts[0]); ctx.lineTo(...pts[1]); ctx.lineTo(...pts[2]); ctx.closePath();
         ctx.fillStyle = op.color; ctx.fill();
       } else if (op.t === "text") {
-        ctx.font = `${op.weight || 400} ${op.size}px ${FONT}`;
+        ctx.font = fontStr(op.size, op.weight || 400, op.family);
         ctx.fillStyle = op.color;
         ctx.textAlign = op.anchor === "end" ? "right" : op.anchor === "middle" ? "center" : "left";
         ctx.textBaseline = "alphabetic";
@@ -124,33 +153,38 @@ const PFImage = (() => {
 
   const x = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const n = v => Math.round(v * 100) / 100;
+  const q = s => s.replace(/"/g, "'");
 
-  // fonts: [{ weight, base64 }] embedded so the SVG renders the same anywhere
+  // fonts: [{ family, weight, style, base64 }] embedded so the SVG renders the same anywhere
   function toSVG(spec, fonts = []) {
     const out = [];
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${n(spec.width)}" height="${n(spec.height)}" viewBox="0 0 ${n(spec.width)} ${n(spec.height)}">`);
-    const faces = fonts.map(f => `@font-face{font-family:"mononoki";font-weight:${f.weight};src:url(data:font/woff2;base64,${f.base64}) format("woff2");}`).join("");
-    out.push(`<style>${faces}text{font-family:${FONT.replace(/"/g, "'")};}</style>`);
+    const faces = fonts.map(f => `@font-face{font-family:"${f.family}";font-weight:${f.weight};font-style:${f.style};src:url(data:font/woff2;base64,${f.base64}) format("woff2");}`).join("");
+    const classes = Object.entries(FAMILIES).map(([k, v]) => `.f-${k}{font-family:${q(v.css)};font-style:${v.style};}`).join("");
+    out.push(`<style>${faces}${classes}</style>`);
     out.push(`<rect width="100%" height="100%" fill="${spec.bg}"/>`);
     for (const op of spec.ops) {
-      const dash = (op.dash && op.dash.length ? ` stroke-dasharray="${op.dash.join(" ")}"` : "") + (op.a != null && op.a < 1 ? ` opacity="${op.a}"` : "");
+      const alpha = op.a != null && op.a < 1 ? ` opacity="${op.a}"` : "";
+      const dash = (op.dash && op.dash.length ? ` stroke-dasharray="${op.dash.join(" ")}"` : "") + alpha;
       if (op.t === "rect") {
         const o = op.stroke ? (op.sw || 1) / 2 : 0;
-        out.push(`<rect x="${n(op.x + o)}" y="${n(op.y + o)}" width="${n(op.w - 2 * o)}" height="${n(op.h - 2 * o)}" fill="${op.fill || "none"}"${op.stroke ? ` stroke="${op.stroke}" stroke-width="${op.sw || 1}"` : ""}${dash}/>`);
+        const r = op.r ? ` rx="${n(Math.max(0, op.r - o))}"` : "";
+        if (op.fill && op.stroke) out.push(`<rect x="${n(op.x)}" y="${n(op.y)}" width="${n(op.w)}" height="${n(op.h)}"${op.r ? ` rx="${op.r}"` : ""} fill="${op.fill}"${alpha}/>`);
+        out.push(`<rect x="${n(op.x + o)}" y="${n(op.y + o)}" width="${n(op.w - 2 * o)}" height="${n(op.h - 2 * o)}"${r} fill="${op.stroke ? "none" : op.fill || "none"}"${op.stroke ? ` stroke="${op.stroke}" stroke-width="${op.sw || 1}"` : ""}${dash}/>`);
       } else if (op.t === "path") {
-        out.push(`<path d="${op.d}" fill="${op.fill || "none"}"${op.stroke ? ` stroke="${op.stroke}" stroke-width="${op.sw || 1}"` : ""}${dash}/>`);
+        out.push(`<path d="${op.d}" fill="${op.fill || "none"}"${op.stroke ? ` stroke="${op.stroke}" stroke-width="${op.sw || 1}" stroke-linecap="round"` : ""}${dash}/>`);
       } else if (op.t === "arrow") {
-        out.push(`<path d="M${arrowPts(op).map(p => p.map(n).join(",")).join(" L")} Z" fill="${op.color}"${op.a != null && op.a < 1 ? ` opacity="${op.a}"` : ""}/>`);
+        out.push(`<path d="M${arrowPts(op).map(p => p.map(n).join(",")).join(" L")} Z" fill="${op.color}"${alpha}/>`);
       } else if (op.t === "text") {
         const anchor = op.anchor && op.anchor !== "start" ? ` text-anchor="${op.anchor}"` : "";
         const ls = op.ls ? ` letter-spacing="${op.ls}"` : "";
-        out.push(`<text x="${n(op.x)}" y="${n(op.y)}" font-size="${op.size}"${op.weight && op.weight !== 400 ? ` font-weight="${op.weight}"` : ""} fill="${op.color}"${anchor}${ls}>${x(op.text)}</text>`);
+        out.push(`<text class="f-${FAMILIES[op.family] ? op.family : "code"}" x="${n(op.x)}" y="${n(op.y)}" font-size="${op.size}"${op.weight && op.weight !== 400 ? ` font-weight="${op.weight}"` : ""} fill="${op.color}"${anchor}${ls}${alpha}>${x(op.text)}</text>`);
       }
     }
     out.push("</svg>");
     return out.join("\n");
   }
 
-  return { FONT, measure, wrap, fitScale, toCanvas, toPNG, toSVG };
+  return { FAMILIES, FONT_FILES, measure, wrap, fitScale, toCanvas, toPNG, toSVG };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = PFImage;

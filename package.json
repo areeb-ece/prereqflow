@@ -3,6 +3,8 @@
   "version": "2.0.0",
   "description": "Course prerequisite flowcharts, with all 16 Ontario Tech engineering program maps built in.",
   "private": true,
+  "author": "areeb",
+  "homepage": "https://areeb-ece.github.io/prereqflow/",
   "license": "MIT",
   "scripts": {
     "test": "node --test \"tests/*.test.js\"",
