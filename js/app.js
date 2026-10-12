@@ -1339,18 +1339,33 @@ const PALETTE = {
 const SITE = "areeb-ece.github.io/prereqflow";
 
 // Reads a sheet's colours from the master palette through a hidden probe element (the
-// master defines both sheets on [data-theme] too). Falls back to PALETTE offline.
+// master defines every theme on [data-theme] too), or the page's own colours for
+// "current". Falls back to PALETTE offline.
 function exportPalette(theme) {
-  const base = PALETTE[theme] || PALETTE.dark;
+  const root = document.documentElement;
+  const cur = theme === "current";
+  const base = PALETTE[cur ? (root.dataset.scheme || root.dataset.theme) : theme] || PALETTE.dark;
   const probe = document.createElement("div");
-  probe.dataset.theme = theme === "light" ? "light" : "dark";
   probe.hidden = true;
+  if (!cur) probe.dataset.theme = theme === "light" ? "light" : "dark";
   document.body.append(probe);
-  const cs = getComputedStyle(probe);
+  const cs = getComputedStyle(cur ? root : probe);
   const v = name => cs.getPropertyValue(name).trim();
+  // Theme colours can be written as color-mix(); the export needs plain rgba().
+  const ctx = document.createElement("canvas").getContext("2d");
+  const plain = c => {
+    probe.style.color = "";
+    probe.style.color = c;
+    if (!probe.style.color) return "";
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = getComputedStyle(probe).color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    return a === 255 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${+(a / 255).toFixed(3)})`;
+  };
   let out = base;
-  if (v("--master")) {
-    const pick = (name, fallback) => v(name) || fallback;
+  if (cur || v("--master")) {
+    const pick = (name, fallback) => (v(name) && plain(v(name))) || fallback;
     out = {
       ...base,
       sheet: pick("--sheet-2", base.sheet), head: pick("--sheet", base.head), card: pick("--card", base.card),
@@ -1358,6 +1373,7 @@ function exportPalette(theme) {
       rule: pick("--rule", base.rule), rule2: pick("--rule-2", base.rule2), back: pick("--danger", base.back), accent: pick("--accent", base.accent),
       h: base.h.map((c, i) => pick(`--h${i}`, c)),
     };
+    if (cur) Object.assign(out, { zoneAlt: pick("--zone-alt", base.zoneAlt), edge: pick("--edge", base.edge) });
   }
   probe.remove();
   return out;
@@ -1383,8 +1399,6 @@ function openImageDlg() {
   const prev = ($("input[name=imgScope]:checked") || {}).value;
   const pick = (scopes.find(s => s.id === prev && s.ok) || scopes.find(s => s.id === (state.highlights.length ? "trees" : "view") && s.ok) || scopes[0]).id;
   $("#imgScope").innerHTML = scopes.map(s => `<label class="choice"><input type="radio" name="imgScope" value="${s.id}"${s.ok ? "" : " disabled"}${s.id === pick ? " checked" : ""}><span>${esc(s.label)}</span></label>`).join("");
-  const th = $(`input[name=imgTheme][value=${document.documentElement.dataset.theme === "light" ? "light" : "dark"}]`);
-  if (th) th.checked = true;
   $("#imgHl").disabled = !state.highlights.length;
   $("#imgStatus").textContent = "";
   updateImageDims();
@@ -1393,7 +1407,7 @@ function openImageDlg() {
 function imageOptions() {
   const val = n => ($(`input[name=${n}]:checked`) || {}).value;
   return {
-    scope: val("imgScope") || "view", scale: +(val("imgScale") || 3), theme: val("imgTheme") || "dark",
+    scope: val("imgScope") || "view", scale: +(val("imgScale") || 3), theme: val("imgTheme") || "current",
     format: val("imgFormat") || "png", title: $("#imgTitle").checked, hl: $("#imgHl").checked && state.highlights.length > 0,
   };
 }
@@ -1624,7 +1638,11 @@ function centreCourse() {
   }
   return best;
 }
+// Motion and theme are shared settings (/design/ui.js) when that loaded: the change is
+// saved there and comes back through SiteDesign.onChange. Offline they're local.
+const shared = window.SiteDesign && SiteDesign.open ? SiteDesign : null;
 function setMotion(on, remember = true) {
+  if (remember && shared) { shared.set({ motion: on }); return; }
   if (on) delete document.documentElement.dataset.motion; else document.documentElement.dataset.motion = "off";
   $("#zMotion").setAttribute("aria-pressed", String(on));
   syncFloat();
@@ -1670,7 +1688,11 @@ $("#btnImport").addEventListener("click", () => { replaceOnImport = false; openI
 $("#tabFiles").addEventListener("click", () => setTab("files"));
 $("#tabPaste").addEventListener("click", () => { setTab("paste"); setTimeout(() => focusRow(rows[rows.length - 1].id), 0); });
 $("#btnAdd").addEventListener("click", () => openEdit(null));
-$("#btnTheme").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+if (shared) shared.onChange(s => setMotion(s.motion, false));
+else {
+  $("#btnTheme").hidden = false;
+  $("#btnTheme").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
+}
 $("#modeSeg").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
 $("#btnUndoImport").addEventListener("click", () => {
   if (!lastUndo) return;
@@ -1942,7 +1964,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "h" && state.selected) setHighlight(state.selected, state.highlights.some(h => h.code === state.selected) ? null : "pre");
 });
 
-setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark", false);
+if (!shared) setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark", false);
 setMotion(document.documentElement.dataset.motion !== "off", false);
 render();
 openWelcome();
