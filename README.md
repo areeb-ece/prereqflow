@@ -1,5 +1,7 @@
 # PrereqFlow
 
+**Live: [areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/)** · made by areeb
+
 Course prerequisite flowcharts in the browser. Every course is a card and every
 prerequisite is a link, so you can see what a course needs and what it unlocks.
 
@@ -34,11 +36,12 @@ python3 -m http.server 8080      # or: npm run serve
 ```
 
 You can also open `index.html` directly from disk. Everything works that way except
-embedding the font into SVG exports, because browsers block `fetch()` on `file://`
-(the SVG then falls back to the viewer's monospace font).
+embedding the fonts into SVG exports, because browsers block `fetch()` on `file://`
+(the SVG then falls back to the fonts installed on the viewer's system).
 
-To host it, enable **GitHub Pages** in the repository (Settings → Pages → Deploy
-from branch → `main` / root). No build is needed.
+It is hosted on **GitHub Pages** at
+[areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/), served straight
+from `main` / root (Settings → Pages → Deploy from branch). No build is needed.
 
 ## Using it
 
@@ -105,12 +108,21 @@ out of a PDF. Each course ends up on its own row and is checked as you type.
 
 ### Zoom and navigation
 
-- **Ctrl/⌘ + scroll** or **pinch**: zoom around the pointer
-- **drag**: pan
+- **scroll**: zoom in and out around the pointer, with eased motion
+- **drag**: pan (a sideways trackpad swipe or **shift + scroll** also pans)
+- **pinch** (trackpad or touch screen): zoom
 - **shift + drag**: draw a box and zoom into that part of the chart
 - `+` / `-` / `0` (fit) / `1` (100%), or the zoom bar at the bottom right
 - **Zoom to chain** (detail panel) and **Zoom to trees** (highlight bar) frame
   just the courses involved
+
+### Motion
+
+Cards drift gently, each on its own rhythm, and a soft light moves slowly behind the
+sheet. Traced and highlighted links carry small particles that flow towards the
+course they unlock. When you switch layouts or programs, cards glide to their new
+places. The **motion** button in the zoom bar turns all of this off. It also stays
+off if your system asks for reduced motion.
 
 ### Tree highlights
 
@@ -131,6 +143,8 @@ session.
   would exceed the browser's canvas limits. **SVG** gives a vector copy with the font
   embedded.
 - **Dark** or **light / print** sheet, with an optional title block and legend.
+- Every image carries a credit (`made by areeb · areeb-ece.github.io/prereqflow`),
+  shown as a badge in the title block and in the footer.
 
 **Export → JSON / CSV / Text lines** saves the course data. All three import back
 into PrereqFlow, so a JSON export is also how you save and share a plan.
@@ -139,14 +153,14 @@ into PrereqFlow, so a JSON export is also how you save and share a plan.
 
 ```
 index.html                    page shell: toolbar, chart stage, dialogs
-css/style.css                 greyscale drafting-sheet theme (dark + light)
+css/style.css                 soft drafting-sheet theme (night + paper), motion
 js/parser.js        PF        course text / PDF table → course records
 js/layout.js        PFLayout  course records → card positions + routed links
 js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
 js/app.js                     state, import, rendering, zoom, highlights, export
 data/*.json                   built-in Ontario Tech data (PrereqFlow export format)
 data/*.js                     the same data wrapped for <script> loading (generated)
-assets/fonts/                 mononoki (SIL Open Font License)
+assets/fonts/                 mononoki, Recursive Casual, Victor Mono (all SIL OFL)
 scripts/build-data.js         regenerates data/*.js from data/*.json
 tests/                        node:test suites for the parser and layout
 ```
@@ -190,6 +204,29 @@ Both views use a Sugiyama-style layered graph drawing:
 The tests check the free-flow guarantee (prerequisites strictly left) against all 16
 programs, the combined view, and data containing corequisites and cycles.
 
+### Look and type
+
+There are two sheets, night (dark) and paper (light). Both use warm neutrals instead
+of pure black and white, one periwinkle/apricot pair for tracing needs/unlocks, and
+six pastel hues for tree highlights. All type is built around mononoki:
+
+| Typeface | Used for |
+| --- | --- |
+| mononoki | course codes, counts, numbers, data |
+| Recursive Mono Casual | wordmark, headings, buttons |
+| Recursive Casual (sans) | course names and body text |
+| Victor Mono Italic | hints, annotations, legends |
+
+The two Recursive files are fixed "casual" instances cut from the variable font
+(CASL = 1), so the same faces also work in canvas image exports.
+
+### Zoom
+
+The chart is scaled with a single CSS transform. Wheel input sets a target zoom, and
+each animation frame closes part of the gap, so a burst of wheel notches becomes one
+smooth glide anchored at the pointer. Moves such as "fit", "zoom to chain" and search
+results tween the zoom (in log space) and the camera centre together.
+
 ### Rendering and export
 
 The chart is HTML cards over one SVG link layer, scaled with a single CSS transform
@@ -217,8 +254,11 @@ JSON, replace `data/ontario-tech-engineering-2026-2027.json` and run
 
 ## Credits
 
-- Typeface: [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
-  SIL Open Font License 1.1 (`assets/fonts/OFL-mononoki.txt`).
+- Made by **areeb**: [areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/).
+- Typefaces, all under the SIL Open Font License 1.1 (licenses in `assets/fonts/`):
+  [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
+  [Recursive](https://github.com/arrowtype/recursive) by Arrow Type,
+  [Victor Mono](https://github.com/rubjo/victor-mono-font) by Rune Bjørnerås.
 - PDF reading: [pdf.js](https://mozilla.github.io/pdf.js/), loaded from a CDN only
   when a PDF is imported.
 - Course data: Ontario Tech University program maps, 2026–2027. Always check the
