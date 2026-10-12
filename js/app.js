@@ -434,7 +434,16 @@ function markerDefs() {
   return ids.map(id => `<marker id="${id}" class="ah" viewBox="0 0 8 8" refX="7.6" refY="4" markerWidth="${id === "ah" || id === "ah-d" ? 7 : 8}" markerHeight="${id === "ah" || id === "ah-d" ? 7 : 8}" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0.8 L8,4 L0,7.2 z"/></marker>`).join("");
 }
 
+// a stable pseudo-random number per course, so each card drifts on its own rhythm
+function hashCode(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+const motionOn = () => document.documentElement.dataset.motion !== "off" && !reduceMotion;
+
 function renderChart() {
+  const before = view ? new Map([...view.nodes].map(([c, n]) => [c, { x: n.x, y: n.y }])) : null;
   view = computeView();
   treeCache = null;
   const { width, height, nodes, dims: D } = view;
@@ -457,6 +466,8 @@ function renderChart() {
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   const hi = $("#edgesHi");
   hi.innerHTML = "";
+  $("#edgesFlow").innerHTML = "";
+  flowKey = "";
   $("#edgesBase").innerHTML = view.edges.map((e, i) => {
     const cls = (e.alt ? "alt" : "") + (e.kind === "back" ? " back" : "");
     return `<path class="e ${cls}" data-i="${i}" data-base="${cls}" d="${e.d}" marker-end="url(#${e.kind === "back" ? "ah-b" : "ah"})"></path>`;
@@ -465,9 +476,27 @@ function renderChart() {
 
   $("#cards").innerHTML = view.visible.map(c => {
     const p = nodes.get(c.code);
-    return `<button type="button" class="card" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="marks"></span></button>`;
+    const h = hashCode(c.code);
+    const fresh = !before || !before.has(c.code);
+    const drift = `--dd:${(5.5 + (h % 45) / 10).toFixed(1)}s;--dl:-${((h >>> 8) % 80) / 10}s${fresh ? `;--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : ""}`;
+    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${drift}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="marks"></span></button>`;
   }).join("");
   cardEls = new Map($$("#cards .card").map(el => [el.dataset.code, el]));
+  // cards that were already on the sheet glide from their old spot; links fade back in
+  if (before && motionOn()) {
+    let moved = false;
+    for (const [code, el] of cardEls) {
+      const o = before.get(code), n = nodes.get(code);
+      if (!o || (o.x === n.x && o.y === n.y)) continue;
+      moved = true;
+      el.animate([{ transform: `translate(${o.x - n.x}px, ${o.y - n.y}px)` }, { transform: "none" }], { duration: 650, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    }
+    if (moved) {
+      svg.classList.add("settling");
+      clearTimeout(renderChart.t);
+      renderChart.t = setTimeout(() => svg.classList.remove("settling"), 420);
+    }
+  }
   sizeWorld();
   renderColhead();
   applyHighlight();
@@ -523,6 +552,50 @@ function setZoom(z, anchor) {
   vp.scrollTop = wy * zoom - ay;
   renderColhead();
 }
+
+// Animated zoom. Wheel notches and buttons set a target; each frame closes part of
+// the gap, so a burst of wheel events turns into one smooth glide.
+let zAnim = null;
+function stopAnim() { if (zAnim) cancelAnimationFrame(zAnim.raf); zAnim = null; }
+function zoomBy(factor, anchor) {
+  if (!view) return;
+  if (!motionOn()) { stopAnim(); setZoom(zoom * factor, anchor); return; }
+  const target = Math.max(Z.min, Math.min(Z.max, (zAnim && zAnim.kind === "zoom" ? zAnim.target : zoom) * factor));
+  if (zAnim && zAnim.kind !== "zoom") stopAnim();
+  if (zAnim) { zAnim.target = target; zAnim.anchor = anchor; return; }
+  zAnim = { kind: "zoom", target, anchor, raf: 0 };
+  const step = () => {
+    const a = zAnim;
+    if (!a) return;
+    const next = zoom * Math.pow(a.target / zoom, 0.24);
+    if (Math.abs(a.target - next) / a.target < 0.003) { setZoom(a.target, a.anchor); zAnim = null; return; }
+    setZoom(next, a.anchor);
+    a.raf = requestAnimationFrame(step);
+  };
+  zAnim.raf = requestAnimationFrame(step);
+}
+// Glide the camera: zoom to z1 with world point (wx, wy) at the centre of the visible area.
+function flyTo(z1, wx, wy, smooth = true) {
+  if (!view) return;
+  stopAnim();
+  const vp = $("#viewport");
+  const ins = drawerInset();
+  const vw = Math.max(80, vp.clientWidth - ins.r), vh = Math.max(80, vp.clientHeight - ins.b);
+  z1 = Math.max(Z.min, Math.min(Z.max, z1));
+  const place = (z, x, y) => { zoom = z; sizeWorld(); vp.scrollLeft = x * z - vw / 2; vp.scrollTop = y * z - vh / 2; renderColhead(); };
+  if (!smooth || !motionOn()) { place(z1, wx, wy); return; }
+  const z0 = zoom, x0 = (vp.scrollLeft + vw / 2) / zoom, y0 = (vp.scrollTop + vh / 2) / zoom;
+  const t0 = performance.now(), dur = 520;
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  zAnim = { kind: "fly", raf: 0 };
+  const step = now => {
+    if (!zAnim || zAnim.kind !== "fly") return;
+    const t = Math.min(1, (now - t0) / dur), k = ease(t);
+    place(z0 * Math.pow(z1 / z0, k), x0 + (wx - x0) * k, y0 + (wy - y0) * k);
+    if (t < 1) zAnim.raf = requestAnimationFrame(step); else zAnim = null;
+  };
+  zAnim.raf = requestAnimationFrame(step);
+}
 // fit a world-space rectangle into the visible part of the viewport
 function fitRect(x0, y0, x1, y1, { maxZ = 1.25, pad = 32, smooth = true } = {}) {
   if (!view) return;
@@ -530,11 +603,9 @@ function fitRect(x0, y0, x1, y1, { maxZ = 1.25, pad = 32, smooth = true } = {}) 
   const ins = drawerInset();
   const vw = Math.max(80, vp.clientWidth - ins.r), vh = Math.max(80, vp.clientHeight - ins.b);
   const z = Math.max(Z.min, Math.min(maxZ, (vw - 2 * pad) / Math.max(1, x1 - x0), (vh - 2 * pad) / Math.max(1, y1 - y0)));
-  zoom = z;
-  sizeWorld();
-  const left = ((x0 + x1) / 2) * z - vw / 2, top = ((y0 + y1) / 2) * z - vh / 2;
-  vp.scrollTo({ left: Math.max(0, left), top: Math.max(0, top), behavior: smooth && !reduceMotion ? "smooth" : "auto" });
-  renderColhead();
+  // keep the sheet's top-left corner from drifting into view when it is smaller than the screen
+  const cx = Math.max((x0 + x1) / 2, vw / 2 / z), cy = Math.max((y0 + y1) / 2, vh / 2 / z);
+  flyTo(z, cx, cy, smooth);
 }
 function fitAll(smooth = true) { if (view) fitRect(0, 0, view.width, view.height, { maxZ: 1, pad: 12, smooth }); }
 function boundsOf(codes) {
@@ -619,6 +690,7 @@ function applyHighlight() {
     if (mEl.dataset.m !== marks) { mEl.innerHTML = marks; mEl.dataset.m = marks; }
   }
   const base = $("#edgesBase"), hi = $("#edgesHi");
+  const flows = [];
   for (const el of edgeEls) {
     const i = +el.dataset.i, e = view.edges[i];
     let s = "", marker = e.kind === "back" ? "ah-b" : "ah", color = "";
@@ -635,10 +707,22 @@ function applyHighlight() {
     const m = `url(#${marker})`;
     if (el.getAttribute("marker-end") !== m) el.setAttribute("marker-end", m);
     const lifted = s === "n" || s === "u" || s === "h";
+    if (lifted && e.kind !== "back") flows.push([i, s === "n" ? "var(--needs)" : s === "u" ? "var(--unlocks)" : color]);
     if (lifted && el.parentNode !== hi) hi.appendChild(el);
     else if (!lifted && el.parentNode !== base) base.appendChild(el);
   }
+  renderFlows(flows);
   renderReadout(focus, anc, desc);
+}
+
+// small particles that travel along traced / highlighted links, towards the course they unlock
+let flowKey = "";
+function renderFlows(flows) {
+  const key = flows.map(f => f.join(":")).join("|");
+  if (key === flowKey) return;
+  flowKey = key;
+  $("#edgesFlow").innerHTML = flows.slice(0, 160).map(([i, color]) =>
+    `<path class="flow" d="${view.edges[i].d}" style="stroke:${color};animation-delay:-${(hashCode(String(i)) % 16) / 10}s"></path>`).join("");
 }
 
 function renderReadout(focus, anc, desc) {
@@ -746,15 +830,7 @@ function revealCard(code) {
 function scrollToCard(code) {
   const p = view && view.nodes.get(code);
   if (!p) return;
-  const vp = $("#viewport");
-  if (zoom < 0.55) { zoom = 0.9; sizeWorld(); }
-  const ins = drawerInset();
-  vp.scrollTo({
-    left: Math.max(0, (p.x + p.w / 2) * zoom - (vp.clientWidth - ins.r) / 2),
-    top: Math.max(0, (p.y + p.h / 2) * zoom - (vp.clientHeight - ins.b) / 2),
-    behavior: reduceMotion ? "auto" : "smooth",
-  });
-  renderColhead();
+  flyTo(zoom < 0.55 ? 0.9 : zoom, p.x + p.w / 2, p.y + p.h / 2);
 }
 
 // ───────────────────────── page chrome ─────────────────────────
@@ -768,6 +844,7 @@ function syncControls() {
   $("#legendProg").hidden = state.programs.length < 2;
   $("#btnExport").disabled = !has;
   $("#zoombar").hidden = !has;
+  $("#credit").hidden = !has;
   $$("#modeSeg button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
   $("#semCount").hidden = state.mode !== "semester";
   const pf = $("#programFilter");
@@ -1128,9 +1205,10 @@ function closeMenu() { $("#exportMenu").hidden = true; $("#btnExport").setAttrib
 // ───────────────────────── image export ─────────────────────────
 // mirrors the CSS custom properties, so the export can use either sheet
 const PALETTE = {
-  dark: { bg: "#0A0A0A", sheet: "#141414", head: "#101010", card: "#121212", ink: "#ECECEC", ink2: "#B4B4B4", ink3: "#7C7C7C", rule: "#2F2F2F", rule2: "#1F1F1F", zoneAlt: "rgba(255,255,255,0.014)", edge: "#4A4A4A", back: "#C98A7C", h: ["#8FA9BF", "#C4A98A", "#9DBA94", "#B49CC6", "#C79C9C", "#8DBDB4"] },
-  light: { bg: "#FFFFFF", sheet: "#FAFAF9", head: "#FFFFFF", card: "#FFFFFF", ink: "#111111", ink2: "#3F3F3F", ink3: "#737373", rule: "#C9C9C6", rule2: "#E2E2DF", zoneAlt: "rgba(0,0,0,0.022)", edge: "#9A9A9A", back: "#9A4A3A", h: ["#4D6A82", "#8A6A40", "#56744C", "#6E5885", "#8E5252", "#47786F"] },
+  dark: { sheet: "#1D2027", head: "#1A1D23", card: "#23272F", ink: "#E8E4DC", ink2: "#BAB5AB", ink3: "#8C8880", rule: "#353A45", rule2: "#2A2E37", zoneAlt: "rgba(150,175,235,0.025)", edge: "#4D5362", back: "#EE9585", accent: "#A3B8F0", h: ["#9FD4AB", "#C4A9F2", "#F0A391", "#EACB76", "#7DCBC4", "#EBA3C6"] },
+  light: { sheet: "#F6F3EC", head: "#FAF8F3", card: "#FFFFFF", ink: "#2F2D36", ink2: "#5D5967", ink3: "#8A8592", rule: "#DDD7CB", rule2: "#E8E3D9", zoneAlt: "rgba(80,105,190,0.03)", edge: "#BDB6AA", back: "#C2564A", accent: "#4F67C6", h: ["#3F8D5B", "#7A58C4", "#C65A45", "#A9831B", "#2B8A84", "#B6508A"] },
 };
+const SITE = "areeb-ece.github.io/prereqflow";
 
 function imageScopes() {
   const sel = state.selected && view && view.nodes.has(state.selected) ? state.selected : null;
@@ -1201,9 +1279,10 @@ function buildImageSpec(o) {
   const trees = o.hl ? treeSets(lay, state.highlights) : { cards: new Map(), edges: new Map(), roots: new Map(), any: false };
   const dim = trees.any && state.dimOthers;
   const ops = [];
-  const titleH = o.title ? 62 : 0, headH = 40, legendH = o.title ? 34 : 0;
+  const W = Math.max(cw, 420);
+  const titleH = o.title ? 84 : 0, headH = 40, footH = 40; // the footer (with the credit) is always drawn
   const top = titleH + headH;
-  const W = cw, H = top + chH + legendH;
+  const H = top + chH + footH;
   const X = x => x - cx, Y = y => y - cy + top; // layout → image
 
   // column zones (under the chart) and header (over it, so a crop scrolls beneath)
@@ -1219,21 +1298,21 @@ function buildImageSpec(o) {
       chrome.push({ t: "path", d: `M${x},${titleH} V${top}`, stroke: major ? P.rule : P.rule2, sw: 1, dash: major ? null : [4, 4] });
     }
     const l = labels[k], lx = X(lay.colX(k));
-    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.main, size: 13, weight: 700, color: P.ink });
-    chrome.push({ t: "text", x: lx + PFImage.measure(l.main, 13, 700) + 8, y: titleH + 25, text: (lay.mode === "semester" ? `${l.band} · ${l.sub}` : l.sub).toUpperCase(), size: 9.5, color: P.ink3, ls: 1 });
-    chrome.push({ t: "text", x: lx + D.colW, y: titleH + 25, text: String(l.n), size: 10.5, color: P.ink3, anchor: "end" });
+    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.main, size: 13.5, weight: 700, family: "code", color: P.ink });
+    chrome.push({ t: "text", x: lx + PFImage.measure(l.main, 13.5, 700, "code") + 8, y: titleH + 25, text: lay.mode === "semester" ? `${l.band.toLowerCase()} · ${l.sub}` : l.sub, size: 11, family: "note", color: P.ink3 });
+    chrome.push({ t: "text", x: lx + D.colW, y: titleH + 25, text: String(l.n), size: 11, family: "code", color: P.ink3, anchor: "end" });
   }
-  chrome.push({ t: "path", d: `M0,${top - 0.5} H${W}`, stroke: P.rule, sw: 1 });
+  chrome.push({ t: "path", d: `M0,${top - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
 
   // links: plain first, highlighted on top
   const edgeOps = [], hiOps = [];
   lay.edges.forEach((e, i) => {
     const hc = trees.edges.has(i) ? P.h[trees.edges.get(i)] : null;
     const color = e.kind === "back" ? P.back : hc || P.edge;
-    const a = dim && !hc ? 0.18 : 1;
+    const a = dim && !hc ? 0.2 : 1;
     const dash = e.kind === "back" ? [2, 3] : e.alt ? [5, 4] : null;
     const list = hc ? hiOps : edgeOps;
-    list.push({ t: "path", d: shiftPath(e.d, -cx, top - cy), stroke: color, sw: hc ? 1.9 : 1.1, dash, a });
+    list.push({ t: "path", d: shiftPath(e.d, -cx, top - cy), stroke: color, sw: hc ? 2 : 1.2, dash, a });
     list.push({ t: "arrow", x: X(e.arrow.x), y: Y(e.arrow.y), dir: e.arrow.dir, color, size: hc ? 8 : 7, a });
   });
   ops.push(...edgeOps, ...hiOps);
@@ -1245,36 +1324,64 @@ function buildImageSpec(o) {
     if (x > W || x + n.w < 0 || y > top + chH || y + n.h < top) continue;
     const tc = trees.cards.get(c.code);
     const hc = tc ? P.h[tc[0]] : null;
-    const a = dim && !hc ? 0.25 : 1;
-    ops.push({ t: "rect", x, y, w: n.w, h: n.h, fill: P.card, stroke: hc || P.rule, sw: trees.roots.has(c.code) ? 2 : 1, a });
-    if (hc) ops.push({ t: "rect", x, y, w: 3, h: n.h, fill: hc });
-    ops.push({ t: "text", x: x + 9, y: y + 19, text: c.code, size: 12, weight: 700, color: hc || P.ink, a });
-    if (c.programs.length > 1) ops.push({ t: "text", x: x + n.w - 9, y: y + 19, text: `×${c.programs.length}`, size: 10.5, color: P.ink3, anchor: "end", a });
-    PFImage.wrap(c.name, n.w - 18, 11, 400, 2).forEach((line, i) => ops.push({ t: "text", x: x + 9, y: y + 36 + i * 14.3, text: line, size: 11, color: P.ink2, a }));
-    if (tc) tc.forEach((ci, i) => ops.push({ t: "rect", x: x + n.w - 7 * (tc.length - i), y: y + n.h - 7, w: 7, h: 7, fill: P.h[ci] }));
+    const a = dim && !hc ? 0.28 : 1;
+    ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: P.card, a });
+    if (hc) ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: hc, a: 0.1 });
+    ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, stroke: hc || P.rule, sw: trees.roots.has(c.code) ? 2.2 : 1, a });
+    ops.push({ t: "text", x: x + 10, y: y + 19, text: c.code, size: 12.5, weight: 700, family: "code", color: hc || P.ink, a });
+    if (c.programs.length > 1) ops.push({ t: "text", x: x + n.w - 10, y: y + 19, text: `×${c.programs.length}`, size: 10.5, family: "code", color: P.ink3, anchor: "end", a });
+    PFImage.wrap(c.name, n.w - 20, 11.5, 450, 2, "text").forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11.5, weight: 450, family: "text", color: P.ink2, a }));
+    if (tc) tc.forEach((ci, i) => ops.push({ t: "rect", x: x + n.w - 6 - 10 * (tc.length - i), y: y + n.h - 12, w: 7, h: 7, r: 3.5, fill: P.h[ci] }));
   }
   ops.push(...chrome);
 
-  // title block + legend
+  // title block
   if (o.title) {
     const prog = state.filter ? (state.filter === MANUAL ? "Added by hand" : shortProg(state.filter)) : state.programs.length > 1 ? `All ${state.programs.length} programs` : state.programs.length ? shortProg(state.programs[0]) : "Courses";
-    const what = scope.id === "trees" ? `Highlighted trees: ${state.highlights.filter(h => lay.nodes.has(h.code)).map(h => `${h.code} (${DIRS[h.dir]})`).join(", ")}`
-      : scope.id === "chain" ? `Prerequisite chain of ${state.selected}` : scope.id === "window" ? "Visible area" : "Full sheet";
+    const what = scope.id === "trees" ? `highlighted trees: ${state.highlights.filter(h => lay.nodes.has(h.code)).map(h => `${h.code} (${DIRS[h.dir]})`).join(", ")}`
+      : scope.id === "chain" ? `prerequisite chain of ${state.selected}` : scope.id === "window" ? "visible area" : "full sheet";
     ops.push({ t: "rect", x: 0, y: 0, w: W, h: titleH, fill: P.head });
-    ops.push({ t: "path", d: `M0,${titleH - 0.5} H${W}`, stroke: P.rule, sw: 1 });
-    ops.push({ t: "text", x: D.padL, y: 27, text: "PREREQ/FLOW", size: 15, weight: 700, color: P.ink, ls: 2.5 });
-    ops.push({ t: "text", x: D.padL, y: 47, text: `${prog} · ${what}`, size: 11.5, color: P.ink2 });
-    const right = `${lay.mode === "free" ? "FREE FLOW" : "BY SEMESTER"} · ${plural(lay.visible.length, "COURSE", "COURSES")} · ${plural(lay.edges.length, "LINK", "LINKS")} · ${today()}`;
-    if (W > 760) ops.push({ t: "text", x: W - D.padR, y: 27, text: right, size: 10.5, color: P.ink3, anchor: "end", ls: 0.8 });
-    const ly = H - legendH / 2 + 4;
+    ops.push({ t: "path", d: `M0,${titleH - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
+    const pre = "PREREQ", sl = "/";
+    ops.push({ t: "text", x: D.padL, y: 32, text: pre, size: 21, weight: 800, family: "ui", color: P.ink, ls: 1 });
+    const x1 = D.padL + PFImage.measure(pre, 21, 800, "ui") + 7;
+    ops.push({ t: "text", x: x1, y: 32, text: sl, size: 21, weight: 500, family: "ui", color: P.accent });
+    ops.push({ t: "text", x: x1 + PFImage.measure(sl, 21, 500, "ui") + 1, y: 32, text: "FLOW", size: 21, weight: 800, family: "ui", color: P.ink, ls: 1 });
+    ops.push({ t: "text", x: D.padL, y: 54, text: `${prog} · ${what}`, size: 13.5, weight: 500, family: "text", color: P.ink2 });
+    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")} · ${today()}`, size: 11.5, family: "note", color: P.ink3 });
+    // credit badge, top right
+    const by = "made by areeb";
+    const bw = Math.max(PFImage.measure(by, 16, 700, "ui"), PFImage.measure(SITE, 13, 400, "code")) + 32;
+    if (W - bw - D.padR > 360) {
+      const bx = W - D.padR - bw, byy = 16;
+      ops.push({ t: "rect", x: bx, y: byy, w: bw, h: 54, r: 12, fill: P.accent, a: 0.12 });
+      ops.push({ t: "rect", x: bx, y: byy, w: bw, h: 54, r: 12, stroke: P.accent, sw: 1.2, a: 0.7 });
+      ops.push({ t: "text", x: bx + 16, y: byy + 23, text: by, size: 16, weight: 700, family: "ui", color: P.ink });
+      ops.push({ t: "text", x: bx + 16, y: byy + 42, text: SITE, size: 13, family: "code", color: P.accent });
+    }
+  }
+
+  // footer: legend (with the title block) and the credit, always
+  const fy = H - footH, ly = fy + footH / 2 + 4;
+  ops.push({ t: "rect", x: 0, y: fy, w: W, h: footH, fill: P.head });
+  ops.push({ t: "path", d: `M0,${fy + 0.5} H${W}`, stroke: P.rule2, sw: 1 });
+  const creditW = PFImage.measure("made by areeb · ", 12.5, 700, "ui") + PFImage.measure(SITE, 12.5, 400, "code");
+  ops.push({ t: "text", x: W - D.padR - PFImage.measure(SITE, 12.5, 400, "code"), y: ly, text: SITE, size: 12.5, family: "code", color: P.accent });
+  ops.push({ t: "text", x: W - D.padR - creditW, y: ly, text: "made by areeb · ", size: 12.5, weight: 700, family: "ui", color: P.ink2 });
+  if (o.title) {
     let lx = D.padL;
-    const item = (draw, text) => { draw(lx); lx += 34; ops.push({ t: "text", x: lx, y: ly, text, size: 10.5, color: P.ink3 }); lx += PFImage.measure(text, 10.5) + 24; };
-    ops.push({ t: "rect", x: 0, y: H - legendH, w: W, h: legendH, fill: P.sheet });
-    ops.push({ t: "path", d: `M0,${H - legendH + 0.5} H${W}`, stroke: P.rule2, sw: 1 });
-    item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.4 }), "required");
-    item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.4, dash: [4, 3] }), "either / or");
-    if (lay.edges.some(e => e.kind === "back")) item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.back, sw: 1.4, dash: [2, 3] }), "listed out of order");
-    if (lay.mode === "free") item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink3, sw: 1 }), "free flow: every prerequisite sits left of what it unlocks");
+    const room = W - D.padR - creditW - 24;
+    const item = (draw, text) => {
+      const w = 34 + PFImage.measure(text, 11.5, 400, "note");
+      if (lx + w > room) return;
+      draw(lx); lx += 34;
+      ops.push({ t: "text", x: lx, y: ly, text, size: 11.5, family: "note", color: P.ink3 });
+      lx += w - 34 + 24;
+    };
+    item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.5 }), "required");
+    item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.5, dash: [4, 3] }), "either / or");
+    if (lay.edges.some(e => e.kind === "back")) item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.back, sw: 1.5, dash: [2, 3] }), "listed out of order");
+    if (lay.mode === "free") item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink3, sw: 1 }), "prerequisites always sit to the left");
   }
   return { width: W, height: H, bg: P.sheet, ops };
 }
@@ -1296,7 +1403,7 @@ async function runImageExport() {
     if (o.format === "svg") {
       const fonts = await fontData();
       saveBlob(new Blob([PFImage.toSVG(spec, fonts)], { type: "image/svg+xml;charset=utf-8" }), base + ".svg");
-      showToast(`Downloaded ${esc(base)}.svg${fonts.length ? "" : " · font not embedded (open the page over http to embed mononoki)"}`, 5000);
+      showToast(`Downloaded ${esc(base)}.svg${fonts.length ? "" : " · fonts not embedded (open the page over http to embed them)"}`, 5000);
     } else {
       const res = await PFImage.toPNG(spec, o.scale);
       saveBlob(res.blob, base + ".png");
@@ -1315,13 +1422,12 @@ async function runImageExport() {
 let fontCache = null;
 async function fontData() {
   if (fontCache) return fontCache;
-  const files = [[400, "assets/fonts/mononoki-Regular.woff2"], [700, "assets/fonts/mononoki-Bold.woff2"]];
   try {
-    fontCache = await Promise.all(files.map(async ([weight, url]) => {
-      const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    fontCache = await Promise.all(PFImage.FONT_FILES.map(async f => {
+      const buf = new Uint8Array(await (await fetch(f.url)).arrayBuffer());
       let s = "";
       for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-      return { weight, base64: btoa(s) };
+      return { family: f.family, weight: f.weight, style: f.style, base64: btoa(s) };
     }));
   } catch (e) { fontCache = []; }
   return fontCache;
@@ -1364,6 +1470,11 @@ function centreCourse() {
     if (d < bd) { bd = d; best = n.code; }
   }
   return best;
+}
+function setMotion(on, remember = true) {
+  if (on) delete document.documentElement.dataset.motion; else document.documentElement.dataset.motion = "off";
+  $("#zMotion").setAttribute("aria-pressed", String(on));
+  if (remember) try { localStorage.setItem("prereqflow.motion", on ? "on" : "off"); } catch (e) { /* not remembered */ }
 }
 function setTheme(t, remember = true) {
   document.documentElement.dataset.theme = t;
@@ -1501,18 +1612,26 @@ $("#editForm").addEventListener("submit", e => { e.preventDefault(); saveEdit();
 $("#fDelete").addEventListener("click", e => arm(e.currentTarget, "Click again to delete", () => { const c = editing; closeDialog("#editDlg"); deleteCourse(c); }));
 
 // zoom controls
-$("#zIn").addEventListener("click", () => setZoom(zoom * 1.25));
-$("#zOut").addEventListener("click", () => setZoom(zoom / 1.25));
-$("#zPct").addEventListener("click", () => setZoom(1));
+$("#zIn").addEventListener("click", () => zoomBy(1.3));
+$("#zOut").addEventListener("click", () => zoomBy(1 / 1.3));
+$("#zPct").addEventListener("click", () => zoomBy(1 / zoom));
+$("#zMotion").addEventListener("click", () => setMotion(document.documentElement.dataset.motion === "off"));
 $("#zFit").addEventListener("click", () => fitAll());
 const vp = $("#viewport");
 vp.addEventListener("scroll", () => requestAnimationFrame(renderColhead), { passive: true });
+// The wheel zooms around the pointer. Shift+wheel keeps the browser's own sideways
+// scroll; a sideways trackpad swipe pans; a trackpad pinch (ctrl+wheel) zooms finer.
 vp.addEventListener("wheel", e => {
-  if (!(e.ctrlKey || e.metaKey)) return;
+  if (e.shiftKey) return;
   e.preventDefault();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? vp.clientHeight : 1;
+  const dx = e.deltaX * unit, dy = e.deltaY * unit;
+  if (!e.ctrlKey && Math.abs(dx) > Math.abs(dy)) { stopAnim(); vp.scrollLeft += dx; return; }
   const r = vp.getBoundingClientRect();
-  const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-  setZoom(zoom * Math.exp(-dy * 0.0022), { x: e.clientX - r.left, y: e.clientY - r.top });
+  const anchor = { x: e.clientX - r.left, y: e.clientY - r.top };
+  const d = Math.max(-150, Math.min(150, dy));
+  if (e.ctrlKey) { stopAnim(); setZoom(zoom * Math.exp(-d * 0.01), anchor); }
+  else zoomBy(Math.exp(-d * 0.0024), anchor);
 }, { passive: false });
 
 // drag to pan; shift+drag draws a box to zoom into
@@ -1529,6 +1648,7 @@ vp.addEventListener("pointermove", e => {
   if (!pan.moved && Math.hypot(dx, dy) < 5) return;
   if (!pan.moved) {
     pan.moved = true;
+    stopAnim();
     vp.setPointerCapture(e.pointerId);
     vp.classList.add(pan.box ? "boxing" : "panning");
     if (state.hovered) { state.hovered = null; applyHighlight(); }
@@ -1660,14 +1780,15 @@ document.addEventListener("keydown", e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName);
   if (typing || topDialog() || !state.courses.size) return;
   if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
-  else if ((e.key === "+" || e.key === "=") && !e.ctrlKey && !e.metaKey) setZoom(zoom * 1.25);
-  else if (e.key === "-" && !e.ctrlKey && !e.metaKey) setZoom(zoom / 1.25);
+  else if ((e.key === "+" || e.key === "=") && !e.ctrlKey && !e.metaKey) zoomBy(1.3);
+  else if (e.key === "-" && !e.ctrlKey && !e.metaKey) zoomBy(1 / 1.3);
   else if (e.key === "0") fitAll();
-  else if (e.key === "1") setZoom(1);
+  else if (e.key === "1") zoomBy(1 / zoom);
   else if (e.key === "h" && state.selected) setHighlight(state.selected, state.highlights.some(h => h.code === state.selected) ? null : "pre");
 });
 
 setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark", false);
+setMotion(document.documentElement.dataset.motion !== "off" && !reduceMotion, false);
 render();
 openWelcome();
 })();
