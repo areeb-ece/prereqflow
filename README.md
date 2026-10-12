@@ -37,9 +37,6 @@ You can also open `index.html` directly from disk. Everything works that way exc
 embedding the font into SVG exports, because browsers block `fetch()` on `file://`
 (the SVG then falls back to the viewer's monospace font).
 
-To host it, enable **GitHub Pages** in the repository (Settings → Pages → Deploy
-from branch → `main` / root). No build is needed.
-
 ## Using it
 
 ### Start screen
