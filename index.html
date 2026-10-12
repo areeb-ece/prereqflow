@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>PrereqFlow</title>
-<meta name="description" content="Course prerequisite flowcharts by areeb. Ships with all 16 Ontario Tech engineering program maps (2026-2027); import your own courses as text, JSON or CSV.">
+<meta name="description" content="Course prerequisite flowcharts by areeb. Ships with all 16 Ontario Tech engineering program maps (2026-2027); mark completed courses, set goals and import your own courses as text, JSON or CSV.">
 <meta name="author" content="areeb">
 <link rel="canonical" href="https://areeb-ece.github.io/prereqflow/">
 <link rel="preload" href="assets/fonts/mononoki-Regular.woff2" as="font" type="font/woff2" crossorigin>
@@ -32,6 +32,10 @@
         <span class="count" id="searchCount"></span>
       </div>
       <select class="ctl" id="programFilter" aria-label="Show courses from" hidden></select>
+      <div class="seg" id="planSeg" role="radiogroup" aria-label="Mode">
+        <button type="button" role="radio" data-plan="0" aria-checked="true" title="Analyse the program maps  [p]">Explore</button>
+        <button type="button" role="radio" data-plan="1" aria-checked="false" title="Mark completed courses and set goal courses  [p]">Plan</button>
+      </div>
       <div class="seg" id="modeSeg" role="radiogroup" aria-label="Layout">
         <button type="button" role="radio" data-mode="semester" aria-checked="true" title="Columns are semesters, as listed in the program map">Semesters</button>
         <button type="button" role="radio" data-mode="free" aria-checked="false" title="Columns come from the prerequisite graph; every prerequisite sits left of the course that needs it">Free flow</button>
@@ -63,6 +67,23 @@
     </div>
     <span class="hint" id="hint">scroll to zoom · drag to pan · hover to trace · click to pin · shift+click to highlight a tree · shift+drag to zoom into an area · double-click to edit</span>
     <div class="trees" id="trees" hidden></div>
+  </div>
+
+  <div class="planbar" id="planbar" hidden>
+    <span class="lbl">click marks</span>
+    <div class="seg" id="brushSeg" role="radiogroup" aria-label="Clicking a course">
+      <button type="button" role="radio" data-brush="done" aria-checked="true" title="Click a course to mark it completed (click again to undo)">✓ completed</button>
+      <button type="button" role="radio" data-brush="goal" aria-checked="false" title="Click a course to make it a goal (click again to remove)">◎ goal</button>
+      <button type="button" role="radio" data-brush="pin" aria-checked="false" title="Click a course to pin it and see its details">pin</button>
+    </div>
+    <span class="pstats" id="planStats"></span>
+    <span class="plegend" aria-label="Plan legend">
+      <span class="k"><span class="sw pd"></span>completed</span>
+      <span class="k"><span class="sw pr"></span>available now</span>
+      <span class="k"><span class="sw pg"></span>goal · path</span>
+      <span class="k"><span class="sw pl"></span>locked</span>
+    </span>
+    <button class="btn" type="button" id="btnPlanPanel" aria-pressed="true" title="Show the plan: goals, the path to them and what's available now">Plan panel</button>
   </div>
 
   <main class="stage" id="stage" data-sky>
@@ -105,7 +126,7 @@
   </main>
 </div>
 
-<input type="file" id="fileInput" multiple accept=".json,.csv,.txt,.md,.pdf,application/json,text/csv,text/plain,application/pdf" hidden>
+<input type="file" id="fileInput" multiple accept=".json,.csv,.txt,.md,application/json,text/csv,text/plain" hidden>
 
 <!-- Welcome -->
 <div class="overlay" id="welcomeDlg" hidden>
@@ -129,12 +150,11 @@
       <section class="opt">
         <span class="tag">[B] your own</span>
         <h3>Import your own courses</h3>
-        <p>Type or paste one course per line, or load a <code>.json</code> / <code>.csv</code> you exported from PrereqFlow earlier.</p>
+        <p>Type or paste one course per line, or load a <code>.json</code> / <code>.csv</code> / <code>.txt</code> (for example one you exported from PrereqFlow earlier).</p>
         <div class="row">
           <button class="btn" type="button" id="wLines">Line input</button>
-          <button class="btn" type="button" id="wFile">Load .json / .csv</button>
+          <button class="btn" type="button" id="wFile">Load .json / .csv / .txt</button>
         </div>
-        <p class="note">Direct program-map (PDF) parsing only works for Ontario Tech program maps, and all of those are already built in under [A].</p>
       </section>
     </div>
     <div class="resume" id="wResume" hidden>
@@ -168,7 +188,6 @@
         <div class="row"><button class="btn primary" type="button" data-action="choose">Choose files</button></div>
         <small>PrereqFlow <b>.json</b> or <b>.csv</b> exports, or <b>.txt</b> with one course per line. Drop them here or anywhere on the page. New courses merge with what's loaded; a course listed in two semesters keeps the earliest.</small>
       </div>
-      <p class="note" style="margin-top:12px">Program-map PDFs: direct parsing only supports the Ontario Tech engineering program-map layout, and all 16 of those maps are already built in (Start over → [A]). Other PDFs: copy their text into Line input instead.</p>
       <p class="status" id="fileStatus" aria-live="polite"></p>
     </div>
     <footer id="pasteFooter">
@@ -286,6 +305,7 @@
 <script src="data/ontario-tech-engineering-2026-2027.js"></script>
 <script src="js/parser.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/plan.js"></script>
 <script src="js/image.js"></script>
 <script src="js/app.js"></script>
 </body>

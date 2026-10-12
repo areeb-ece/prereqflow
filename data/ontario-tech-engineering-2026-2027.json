@@ -2118,7 +2118,9 @@
       "term": "3-2",
       "prereqs": [],
       "coreqs": [],
-      "notes": [],
+      "notes": [
+        "Completion of at least 54 credit hours"
+      ],
       "ignored": [],
       "programs": [
         "Automotive Engineering 2026-2027",
@@ -2819,7 +2821,9 @@
       "term": "4-1",
       "prereqs": [],
       "coreqs": [],
-      "notes": [],
+      "notes": [
+        "Completion of at least 84 credit hours"
+      ],
       "ignored": [],
       "programs": [
         "Automotive Engineering 2026-2027",

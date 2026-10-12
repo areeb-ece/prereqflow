@@ -1,6 +1,6 @@
-/* PrereqFlow page: state, import, chart rendering, zoom, highlights and exports.
- * Depends on PF (parser.js), PFLayout (layout.js), PFImage (image.js) and the
- * built-in data set (window.PREREQFLOW_DEFAULT). */
+/* PrereqFlow page: state, import, chart rendering, zoom, highlights, planning and exports.
+ * Depends on PF (parser.js), PFLayout (layout.js), PFPlan (plan.js), PFImage (image.js)
+ * and the built-in data set (window.PREREQFLOW_DEFAULT). */
 (() => {
 "use strict";
 
@@ -70,6 +70,30 @@ function readSaved() {
   } catch (e) { return null; }
 }
 
+// Plan mode: completed courses and goal courses. Kept apart from the sheet, so it
+// survives switching programs, reloading the built-in maps and turning plan mode off.
+// A course is completed everywhere it appears, whichever program is shown.
+const PLAN_KEY = "prereqflow.plan.v1";
+const BRUSHES = ["done", "goal", "pin"];
+const plan = { on: false, brush: "done", panel: true, completed: new Set(), goals: [] };
+function loadPlan() {
+  try {
+    const o = JSON.parse(localStorage.getItem(PLAN_KEY) || "null");
+    if (!o) return;
+    plan.on = !!o.on;
+    if (BRUSHES.includes(o.brush)) plan.brush = o.brush;
+    if (typeof o.panel === "boolean") plan.panel = o.panel;
+    plan.completed = new Set((Array.isArray(o.completed) ? o.completed : []).map(PF.normCode).filter(Boolean));
+    plan.goals = [...new Set((Array.isArray(o.goals) ? o.goals : []).map(PF.normCode).filter(Boolean))];
+  } catch (e) { /* storage unavailable or unreadable: start with an empty plan */ }
+}
+function savePlan() {
+  try {
+    localStorage.setItem(PLAN_KEY, JSON.stringify({ on: plan.on, brush: plan.brush, panel: plan.panel, completed: [...plan.completed].sort(cmpCode), goals: plan.goals }));
+  } catch (e) { /* storage unavailable: the plan just won't be remembered */ }
+}
+loadPlan();
+
 function toGroups(v) {
   if (!v) return [];
   if (typeof v === "string") { const r = PF.parseRequirementText(v); return [...r.prereqs, ...r.coreqs]; }
@@ -97,7 +121,10 @@ function normalizeCourse(c) {
 }
 
 // ───────────────────────── PDF reading (pdf.js, loaded on first use) ─────────────────────────
-// Only the Ontario Tech program-map table layout is understood; those maps are built in.
+// Only the Ontario Tech program-map table layout is understood. Every current map is built
+// in, so PDF import is switched off; the reader stays for parsing future years' maps
+// (set PDF_IMPORT to true to offer it in the file picker again).
+const PDF_IMPORT = false;
 const PDFJS_SOURCES = [
   { lib: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.mjs", worker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.mjs" },
   { lib: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs", worker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs" },
@@ -207,7 +234,10 @@ function fromJson(text, fileName) {
   rep.courses = records.length;
   for (const r of records) { rep.restrictions += r.ignored.length; rep.coreqs += r.coreqs.length; rep.alts += [...r.prereqs, ...r.coreqs].filter(g => g.length > 1).length; }
   const programs = (o && Array.isArray(o.programs)) ? o.programs.map(String) : [...new Set(records.flatMap(r => r.programs))];
-  return { records, programs, report: rep, semCount: o && +o.semesters };
+  const p = o && o.plan;
+  const planIn = p && (Array.isArray(p.completed) || Array.isArray(p.goals))
+    ? { completed: (p.completed || []).map(PF.normCode).filter(Boolean), goals: (p.goals || []).map(PF.normCode).filter(Boolean) } : null;
+  return { records, programs, report: rep, semCount: o && +o.semesters, plan: planIn };
 }
 function parseCSV(text) {
   const rows = [];
@@ -258,7 +288,10 @@ function fromCsv(text, fileName) {
 
 async function readFile(file) {
   const ext = (file.name.match(/\.([^.]+)$/) || [, ""])[1].toLowerCase();
-  if (ext === "pdf" || file.type === "application/pdf") return readPdf(file);
+  if (ext === "pdf" || file.type === "application/pdf") {
+    if (PDF_IMPORT) return readPdf(file);
+    throw new Error("PDFs aren't imported: every Ontario Tech engineering program map is already built in. Load a .json, .csv or .txt, or paste course lines into Line input.");
+  }
   const text = await file.text();
   if (ext === "json" || /^\s*[\[{]/.test(text)) return fromJson(text, file.name);
   if (ext === "csv") return fromCsv(text, file.name);
@@ -375,7 +408,7 @@ async function importFiles(fileList) {
     if (files.length > 1) showToast(`<span class="spin"></span>Reading ${i + 1} of ${files.length}: ${esc(f.name)}`, 0);
     try {
       const res = await readFile(f);
-      batches.push({ records: res.records, programs: res.programs, label: res.report.program || f.name, semCount: res.semCount });
+      batches.push({ records: res.records, programs: res.programs, label: res.report.program || f.name, semCount: res.semCount, plan: res.plan });
       reports.push(res.report);
     } catch (e) {
       const r = newReport(f.name, PF.programFromFilename(f.name), "");
@@ -391,6 +424,16 @@ async function importFiles(fileList) {
     return;
   }
   const result = mergeBatches(batches);
+  // a PrereqFlow JSON export carries its plan: add it to the one already here
+  const planned = batches.filter(b => b.plan);
+  if (planned.length) {
+    for (const b of planned) {
+      for (const c of b.plan.completed) plan.completed.add(c);
+      for (const g of b.plan.goals) if (!plan.goals.includes(g)) plan.goals.push(g);
+    }
+    planCache = null;
+    savePlan();
+  }
   render();
   fitAll(false);
   showReport(reports, result);
@@ -409,8 +452,10 @@ function visibleCourses() {
   return all.filter(c => c.programs.includes(state.filter));
 }
 
+// requirements written as notes (see plan.js) that the layout draws: Capstone's years 1–3
+const withRules = c => { const y = PFPlan.rules(c).yearsComplete; return y ? { ...c, yearsComplete: y } : c; };
 function computeView(courses = visibleCourses(), opts = {}) {
-  const lay = PFLayout.compute(courses, { mode: state.mode, semCount: opts.semCount || state.semCount });
+  const lay = PFLayout.compute(courses.map(withRules), { mode: state.mode, semCount: opts.semCount || state.semCount });
   lay.visible = courses;
   return lay;
 }
@@ -567,6 +612,7 @@ function renderChart() {
   const before = view ? new Map([...view.nodes].map(([c, n]) => [c, { x: n.x, y: n.y }])) : null;
   view = computeView();
   treeCache = null;
+  planCache = null;
   const { width, height, nodes, dims: D } = view;
   const world = $("#world");
   world.style.width = width + "px";
@@ -590,7 +636,7 @@ function renderChart() {
   $("#edgesFlow").innerHTML = "";
   flowKey = "";
   $("#edgesBase").innerHTML = view.edges.map((e, i) => {
-    const cls = (e.alt ? "alt" : "") + (e.kind === "back" ? " back" : "");
+    const cls = (e.alt ? "alt" : "") + (e.kind === "back" ? " back" : "") + (e.kind === "bus" ? " bus" : "");
     return `<path class="e ${cls}" data-i="${i}" data-base="${cls}" d="${e.d}" marker-end="url(#${e.kind === "back" ? "ah-b" : "ah"})"></path>`;
   }).join("");
   edgeEls = $$("#edgesBase path");
@@ -600,7 +646,8 @@ function renderChart() {
     const h = hashCode(c.code);
     const fresh = !before || !before.has(c.code);
     const drift = `--sd:${(9 + (h % 70) / 10).toFixed(1)}s;--sdl:-${((h >>> 8) % 160) / 10}s${fresh ? `;--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : ""}`;
-    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${drift}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="marks"></span></button>`;
+    const rq = ruleTag(c);
+    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${drift}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${rq ? `<i class="rq" title="${esc(rq.title)}">${esc(rq.text)}</i>` : ""}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="pm"></span><span class="marks"></span></button>`;
   }).join("");
   cardEls = new Map($$("#cards .card").map(el => [el.dataset.code, el]));
   // cards that were already on the sheet glide from their old spot; links fade back in
@@ -622,7 +669,16 @@ function renderChart() {
   sizeWorld();
   renderColhead();
   applyHighlight();
+  syncPlanbar();
   syncFloat();
+}
+
+// the requirements with no links of their own get a small tag on the card
+function ruleTag(c) {
+  const r = PFPlan.rules(c);
+  if (r.yearsComplete) return { text: `Y1–${r.yearsComplete}`, title: `Needs every program course in years 1–${r.yearsComplete}` };
+  if (r.minCredits) return { text: `${r.minCredits} cr`, title: `Needs at least ${r.minCredits} credit hours (${Math.ceil(r.minCredits / PFPlan.CREDITS)} courses)` };
+  return null;
 }
 
 function renderColhead() {
@@ -800,9 +856,26 @@ function applyHighlight() {
   const matches = q ? new Set(view.visible.filter(c => matchesQuery(c, q)).map(c => c.code)) : null;
   $("#searchCount").textContent = q ? String(matches.size) : "";
   const trees = treeSets();
+  const P = plan.on ? planInfo() : null;
+  const path = P && P.path;
   for (const [code, el] of cardEls) {
     let cls = "card";
     const tc = trees.cards.get(code);
+    let pm = "", pmCls = "";
+    if (P) {
+      const st = P.status.get(code);
+      cls += st.state === "done" ? " p-done" : st.state === "ready" ? " p-ready" : " p-locked";
+      const goal = path && path.goals.includes(code), step = path && path.step.get(code);
+      if (goal) cls += " p-goal";
+      else if (step) cls += " p-path";
+      else if (path && st.state !== "done") cls += " p-off";
+      if (goal) { pm = step ? `◎ goal · ${step}` : st.state === "done" ? "◎ ✓ done" : "◎ goal"; pmCls = "goal"; }
+      else if (st.state === "done") { pm = "✓ done"; pmCls = "done"; }
+      else if (step) { pm = `step ${step}`; pmCls = "step"; }
+      else if (st.state === "ready") { pm = "available"; pmCls = "ready"; }
+      else if (st.creditsShort) { pm = `${P.credits}/${st.minCredits} cr`; pmCls = "lock"; }
+      else if (st.years && st.years.left.length) { pm = `${st.years.left.length} left`; pmCls = "lock"; }
+    }
     if (anc) cls += code === focus ? " is-focus" : anc.has(code) ? " is-needs" : desc.has(code) ? " is-unlocks" : " is-dim";
     else if (matches) cls += matches.has(code) ? " is-match" : " is-dim";
     else if (trees.any) cls += tc ? " is-hl" + (trees.roots.has(code) ? " is-root" : "") : state.dimOthers ? " is-dim" : "";
@@ -815,6 +888,9 @@ function applyHighlight() {
     const marks = tc ? tc.map(c => `<i style="--hc:var(--h${c})"></i>`).join("") : "";
     const mEl = el.lastElementChild;
     if (mEl.dataset.m !== marks) { mEl.innerHTML = marks; mEl.dataset.m = marks; }
+    const pEl = mEl.previousElementSibling, pc = "pm" + (pmCls ? " " + pmCls : "");
+    if (pEl.textContent !== pm) pEl.textContent = pm;
+    if (pEl.className !== pc) pEl.className = pc;
   }
   const base = $("#edgesBase"), hi = $("#edgesHi");
   const flows = [];
@@ -826,15 +902,15 @@ function applyHighlight() {
     else if (trees.any) {
       if (trees.edges.has(i)) { s = "h"; color = `var(--h${trees.edges.get(i)})`; marker = `ah-h${trees.edges.get(i)}`; }
       else if (state.dimOthers) s = "d";
-    }
-    if (s === "n" || s === "u" || s === "d") marker = `ah-${s}`;
+    } else if (path && path.needed.size) s = path.needed.has(e.from) && path.needed.has(e.to) ? "g" : "d";
+    if (s === "n" || s === "u" || s === "d" || s === "g") marker = `ah-${s}`;
     const cls = `e ${el.dataset.base} ${s}`.replace(/\s+/g, " ").trim();
     if (el.getAttribute("class") !== cls) el.setAttribute("class", cls);
     if (el.style.stroke !== color) el.style.stroke = color;
     const m = `url(#${marker})`;
     if (el.getAttribute("marker-end") !== m) el.setAttribute("marker-end", m);
-    const lifted = s === "n" || s === "u" || s === "h";
-    if (lifted && e.kind !== "back") flows.push([i, s === "n" ? "var(--needs)" : s === "u" ? "var(--unlocks)" : color]);
+    const lifted = s === "n" || s === "u" || s === "h" || s === "g";
+    if (lifted && e.kind !== "back") flows.push([i, s === "n" ? "var(--needs)" : s === "u" ? "var(--unlocks)" : s === "g" ? "var(--goal)" : color]);
     if (lifted && el.parentNode !== hi) hi.appendChild(el);
     else if (!lifted && el.parentNode !== base) base.appendChild(el);
   }
@@ -858,7 +934,8 @@ function renderReadout(focus, anc, desc) {
   const c = state.courses.get(focus);
   const direct = view.preds.get(focus).length, unl = view.succs.get(focus).length;
   r.innerHTML = `<span class="c">${esc(c.code)}</span><span class="nm">${esc(c.name)}</span>
-    <span class="st"><span class="n">${anc.size - 1}</span> in prerequisite chain (${direct} direct) · <span class="u">${desc.size - 1}</span> unlocked (${unl} direct)</span>`;
+    <span class="st"><span class="n">${anc.size - 1}</span> in prerequisite chain (${direct} direct) · <span class="u">${desc.size - 1}</span> unlocked (${unl} direct)</span>`
+    + (plan.on ? `<span class="ps ${planInfo().status.get(focus).state}">${esc(statusText(focus, true))}</span>` : "");
   r.hidden = false;
 }
 
@@ -894,6 +971,138 @@ function renderTrees() {
     + `<button type="button" class="btn ghost" id="treeClear">Clear</button>`;
 }
 
+// ───────────────────────── planning ─────────────────────────
+// availability and the goal path, recomputed after any change to the sheet, the
+// program filter or the plan
+let planCache = null;
+function planInfo() {
+  if (planCache) return planCache;
+  const program = state.filter && state.filter !== MANUAL ? state.filter : "";
+  const ev = PFPlan.evaluate(state.courses, plan.completed, program);
+  const goals = plan.goals.filter(g => state.courses.has(g));
+  planCache = { ...ev, program, path: goals.length ? PFPlan.plan(state.courses, plan.completed, goals, program) : null };
+  return planCache;
+}
+const progName = p => p ? shortProg(p) : "the loaded courses";
+// one line on why a course is or isn't available
+function statusText(code, short = false) {
+  const P = planInfo(), st = P.status.get(code);
+  if (!st) return "";
+  if (st.state === "done") return "Completed";
+  if (st.state === "ready") return "Available now";
+  const bits = [];
+  const grp = g => g.length > 1 ? g.join(" or ") : g[0];
+  if (st.prereqs.length) bits.push(`needs ${st.prereqs.map(grp).join(", ")}`);
+  if (st.coreqs.length) bits.push(`coreq ${st.coreqs.map(grp).join(", ")}`);
+  if (st.creditsShort) bits.push(`needs ${st.minCredits} credit hours (${P.credits} so far, ${Math.ceil(st.creditsShort / PFPlan.CREDITS)} more courses)`);
+  if (st.years && st.years.left.length) bits.push(`${plural(st.years.left.length, "course")} left in years 1–${st.years.years}${short ? "" : ` of ${progName(st.years.program)}`}`);
+  return "Locked: " + bits.join("; ");
+}
+function setPlanOn(on) {
+  const drawer = $("#details").hidden;
+  plan.on = on;
+  savePlan();
+  syncControls();
+  renderDetails();
+  applyHighlight();
+  if (drawer !== $("#details").hidden) fitAll(); // the plan panel opened or closed
+}
+function setBrush(b) {
+  plan.brush = b;
+  savePlan();
+  syncControls();
+}
+function planChanged() {
+  planCache = null;
+  savePlan();
+  syncControls();
+  renderDetails();
+  applyHighlight();
+}
+function toggleDone(code) {
+  if (!code || !state.courses.has(code)) return;
+  const was = new Set([...planInfo().status].filter(([, st]) => st.state === "ready").map(([c]) => c));
+  const on = !plan.completed.has(code);
+  if (on) plan.completed.add(code); else plan.completed.delete(code);
+  planChanged();
+  // a short pulse on the courses this just opened up
+  const fresh = [...planInfo().status].filter(([c, st]) => st.state === "ready" && !was.has(c)).map(([c]) => c);
+  if (motionOn()) for (const c of fresh) { const el = cardEls.get(c); if (el) el.animate([{ scale: 1 }, { scale: 1.07 }, { scale: 1 }], { duration: 650, easing: "ease-out" }); }
+  const shown = fresh.filter(c => view && view.nodes.has(c));
+  showToast(on ? `✓ ${esc(code)} completed${shown.length ? ` · ${plural(shown.length, "course")} now available` : ""}` : `${esc(code)} marked not completed`, 2200);
+}
+function toggleGoal(code) {
+  if (!code || !state.courses.has(code)) return;
+  const i = plan.goals.indexOf(code);
+  if (i >= 0) plan.goals.splice(i, 1); else plan.goals.push(code);
+  if (i < 0) plan.panel = true;
+  planChanged();
+  if (i < 0) {
+    const n = planInfo().path.needed.size;
+    showToast(plan.completed.has(code) ? `${esc(code)} is already completed` : `◎ ${esc(code)} set as a goal · ${plural(n, "course")} to take`, 2600);
+  }
+}
+function planItem(code, P) {
+  const c = state.courses.get(code);
+  const st = P.status.get(code);
+  const off = !view || !view.nodes.has(code);
+  const cr = st && st.state === "locked" && st.creditsShort ? ` · ${st.minCredits} cr` : "";
+  return `<button type="button" class="pitem ${st ? st.state : ""}" data-goto="${esc(code)}" title="${esc(statusText(code))}${off ? " · not in the shown program" : ""}"><b>${esc(code)}</b><span>${esc(c.name)}</span><i>${semLabel(c.semester)}${cr}${P.path && P.path.goals.includes(code) ? " · ◎" : ""}</i></button>`;
+}
+// the drawer's contents in plan mode when no course is pinned
+function planPanelHtml() {
+  const P = planInfo();
+  const vis = view ? view.visible : [];
+  const doneShown = vis.filter(c => plan.completed.has(c.code)).length;
+  const scope = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : `all ${plural(state.programs.length, "program")}`;
+  let h = `<header><span class="dcode">Plan</span><button class="xbtn" type="button" id="dClose" aria-label="Close the plan panel">×</button>
+    <div class="dname">${plural(P.count, "course")} completed · ${P.credits} credit hours</div>
+    <div class="dsem">${doneShown} of ${vis.length} shown completed · ${esc(scope)}</div></header><div class="dbody">`;
+  if (!plan.completed.size && !plan.goals.length) {
+    h += `<p class="note" style="margin-top:14px">Click a course to mark it completed; what you can take next lights up. Switch the plan bar to <b>◎ goal</b> and click a course to see, in order, what it takes to get there. Completed courses count in every program, and are kept between visits.</p>`;
+  }
+  // goals and the path to them
+  const path = P.path;
+  h += `<h3>Goals <span class="ct">${plan.goals.length}</span></h3>`;
+  if (!plan.goals.length) h += `<p class="plain muted">No goals yet. Pick <b>◎ goal</b> in the plan bar, then click a course (or use “Set as goal” on a pinned course).</p>`;
+  else {
+    h += `<div class="grp">${plan.goals.map(g => {
+      const c = state.courses.get(g);
+      return `<span class="gchip${c ? "" : " missing"}" title="${c ? esc(c.name) : "Not in the loaded courses"}">${c ? `<button type="button" class="gl" data-goto="${esc(g)}">◎ ${esc(g)}</button>` : `◎ ${esc(g)}`}<button type="button" class="x" data-ungoal="${esc(g)}" aria-label="Remove goal ${esc(g)}">×</button></span>`;
+    }).join("")}</div>`;
+    if (path) {
+      if (path.doneGoals.length) h += `<p class="plain muted" style="margin-top:8px">Already completed: ${esc(path.doneGoals.join(", "))}.</p>`;
+      if (!path.needed.size) h += `<p class="plain" style="margin-top:8px">Nothing left to take for ${path.goals.length > 1 ? "these goals" : "this goal"}.</p>`;
+      else {
+        h += `<h3>Path, in order <span class="ct">${plural(path.needed.size, "course")}</span></h3><div class="steps">`;
+        path.steps.forEach((list, i) => {
+          const now = list.every(x => P.status.get(x).state === "ready");
+          h += `<div class="step"><div class="sh"><b>Step ${i + 1}</b><span>${i === 0 ? (now ? "available now" : "start here") : `after step ${i}`}</span></div>${list.map(x => planItem(x, P)).join("")}</div>`;
+        });
+        h += `</div><p class="plain muted" style="margin-top:8px">A step is one round of courses: each only needs earlier steps (corequisites can share one). Where a requirement offers a choice, the option with the fewest courses left is used.</p>`;
+        for (const [code, pool] of path.pools) h += `<p class="plain muted" style="margin-top:6px">${esc(code)} needs every year 1–${pool.years} course of ${esc(progName(pool.program))}${!P.program && pool.program ? " (the program with the fewest left)" : ""}: ${plural(pool.left.length, "course")} to go.</p>`;
+        for (const [code, n] of path.short) h += `<p class="plain" style="margin-top:6px">${esc(code)} needs ${PFPlan.rules(state.courses.get(code)).minCredits} credit hours: take ${plural(n, "more course")} (electives count) before it.</p>`;
+      }
+    }
+  }
+  // available now, in this view
+  const ready = vis.filter(c => P.status.get(c.code).state === "ready").sort((a, b) => a.semester - b.semester || cmpCode(a.code, b.code));
+  h += `<h3>Available now <span class="ct">${ready.length}</span></h3>`;
+  h += ready.length ? `<div class="plist">${ready.map(c => planItem(c.code, P)).join("")}</div>` : `<p class="plain muted">${vis.length && doneShown === vis.length ? "Every shown course is completed." : "Nothing shown is available yet."}</p>`;
+  h += `</div><footer><button class="btn" type="button" id="pClearGoals"${plan.goals.length ? "" : " disabled"}>Clear goals</button><button class="btn danger" type="button" id="pClearDone"${plan.completed.size ? "" : " disabled"}>Clear completed</button></footer>`;
+  return h;
+}
+// the plan block at the top of a pinned course's details
+function planDetailsHtml(c) {
+  const P = planInfo(), st = P.status.get(c.code);
+  const goal = plan.goals.includes(c.code);
+  let h = `<h3>Plan</h3><p class="pstat ${st.state}">${esc(statusText(c.code))}</p>
+    <div class="hlrow"><button type="button" class="btn${st.state === "done" ? " on" : ""}" id="dDone" aria-pressed="${st.state === "done"}">${st.state === "done" ? "✓ Completed" : "Mark completed"}</button>
+    <button type="button" class="btn${goal ? " on" : ""}" id="dGoal" aria-pressed="${goal}">${goal ? "◎ Goal" : "Set as goal"}</button></div>`;
+  if (st.years && st.years.left.length) h += `<p class="plain muted" style="margin-top:8px">Still to complete (${esc(progName(st.years.program))}):</p><div class="grp" style="margin-top:6px">${st.years.left.map(x => chip(x, "n")).join("")}</div>`;
+  return h;
+}
+
 // ───────────────────────── details drawer ─────────────────────────
 function chip(code, cls = "") {
   const c = state.courses.get(code);
@@ -907,19 +1116,39 @@ function renderDetails() {
   const d = $("#details");
   const c = state.selected && state.courses.get(state.selected);
   const wasOpen = !d.hidden;
-  if (!c) {
+  const panel = !c && plan.on && plan.panel && state.courses.size > 0;
+  if (!c && !panel) {
     d.hidden = true; $("#stage").classList.remove("drawer-open");
     if (wasOpen) sizeWorld();
     return;
   }
   $("#stage").classList.add("drawer-open");
-  const unlocks = [...state.courses.values()].filter(o => [...o.prereqs, ...o.coreqs].some(g => g.includes(c.code))).map(o => o.code).sort(cmpCode);
+  if (panel) {
+    const sc = d.querySelector(".dbody"), keep = sc && d.dataset.kind === "plan" ? sc.scrollTop : 0;
+    d.innerHTML = planPanelHtml();
+    d.dataset.kind = "plan";
+    d.querySelector(".dbody").scrollTop = keep;
+    d.hidden = false;
+    if (!wasOpen) sizeWorld();
+    return;
+  }
+  d.dataset.kind = "course";
+  // Capstone's years 1–3 requirement counts as a prerequisite of the courses it covers
+  const lim = course => PFPlan.rules(course).yearsComplete * 2;
+  const shownCap = view ? view.visible.filter(o => lim(o) && o.code !== c.code && !lim(c) && c.semester <= lim(o) && view.nodes.has(c.code)) : [];
+  const unlocks = [...new Set([...[...state.courses.values()].filter(o => [...o.prereqs, ...o.coreqs].some(g => g.includes(c.code))).map(o => o.code), ...shownCap.map(o => o.code)])].sort(cmpCode);
   const hl = state.highlights.find(h => h.code === c.code);
-  let html = `<header><span class="dcode">${esc(c.code)}</span><button class="xbtn" type="button" id="dClose" aria-label="Close details">×</button>
+  let html = `<header><span class="dcode">${esc(c.code)}</span><span class="hbtns">${plan.on ? `<button class="btn ghost" type="button" id="dBack" title="Back to the plan panel">← plan</button>` : ""}<button class="xbtn" type="button" id="dClose" aria-label="Close details">×</button></span>
     <div class="dname">${esc(c.name)}</div><div class="dsem">${semLabel(c.semester)} · ${semLong(c.semester)}</div></header><div class="dbody">`;
+  if (plan.on) html += planDetailsHtml(c);
   html += `<h3>Highlight tree</h3><div class="hlrow"><div class="seg" role="group" aria-label="Highlight tree">${Object.entries(DIRS).map(([k, v]) =>
     `<button type="button" data-hl="${k}" aria-pressed="${!!hl && hl.dir === k}">${v}</button>`).join("")}</div><button type="button" class="btn" id="dZoom" style="height:28px">Zoom to chain</button></div>`;
-  html += `<h3>Prerequisites <span class="ct">${c.prereqs.length}</span></h3>` + (c.prereqs.length ? `<div class="groups">${groupsHtml(c.prereqs, "n")}</div>` : `<p class="plain muted">None listed.</p>`);
+  const yrs = PFPlan.rules(c).yearsComplete;
+  const capPre = yrs && view && view.nodes.has(c.code) ? view.preds.get(c.code).filter(x => !c.prereqs.some(g => g.includes(x))).length : 0;
+  html += `<h3>Prerequisites <span class="ct">${c.prereqs.length + (yrs ? 1 : 0)}</span></h3>` + (c.prereqs.length ? `<div class="groups">${groupsHtml(c.prereqs, "n")}</div>` : yrs ? "" : `<p class="plain muted">None listed.</p>`);
+  if (yrs) html += `<p class="plain"${c.prereqs.length ? ' style="margin-top:6px"' : ""}>Every program course in years 1–${yrs}${capPre ? `: ${plural(capPre, "course")} shown, linked along the bottom of the sheet` : ""}.</p>`;
+  const cr = PFPlan.rules(c).minCredits;
+  if (cr) html += `<p class="plain" style="margin-top:6px">At least ${cr} credit hours completed (${Math.ceil(cr / PFPlan.CREDITS)} courses at 3 credit hours each). Not drawn as links.</p>`;
   if (c.coreqs.length) html += `<h3>Corequisites <span class="ct">${c.coreqs.length}</span></h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted" style="margin-top:6px">Taken before or alongside; drawn like prerequisites.</p>`;
   html += `<h3>Required by <span class="ct">${unlocks.length}</span></h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
   if (c.notes.length) html += `<h3>Notes</h3>${c.notes.map(n => `<p class="plain">${esc(n)}</p>`).join("")}`;
@@ -945,6 +1174,7 @@ function select(code, { scroll = false, fromCard = false } = {}) {
     if (fromCard) revealCard(state.selected);
   }
   applyHighlight();
+  if (plan.on) syncPlanbar();
   if (scroll && state.selected) scrollToCard(state.selected);
 }
 // keep a pinned card from sitting under the drawer / bottom sheet
@@ -973,6 +1203,7 @@ function syncControls() {
   $("#zoombar").hidden = !has;
   $("#credit").hidden = !has;
   $$("#modeSeg button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.mode === state.mode)));
+  syncPlanbar(has);
   $("#semCount").hidden = state.mode !== "semester";
   const pf = $("#programFilter");
   const manual = [...state.courses.values()].filter(c => !c.programs.length).length;
@@ -989,6 +1220,24 @@ function syncControls() {
     if (pf.value !== state.filter) { state.filter = ""; pf.value = ""; }
   } else state.filter = "";
   $("#semCount").value = String(state.semCount);
+}
+function syncPlanbar(has = state.courses.size > 0) {
+  const on = plan.on && has;
+  $("#app").classList.toggle("planning", on);
+  $$("#planSeg button").forEach(b => b.setAttribute("aria-checked", String((b.dataset.plan === "1") === plan.on)));
+  $("#planbar").hidden = !on;
+  $("#hint").textContent = plan.on
+    ? "plan mode · click courses to mark them completed · ◎ goal: click a course to plan a route to it · pin: inspect a course · hover to trace"
+    : "scroll to zoom · drag to pan · hover to trace · click to pin · shift+click to highlight a tree · shift+drag to zoom into an area · double-click to edit";
+  if (!on) return;
+  $$("#brushSeg button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.brush === plan.brush)));
+  const P = planInfo();
+  const vis = view ? view.visible : visibleCourses();
+  const ready = vis.filter(c => P.status.get(c.code).state === "ready").length;
+  const path = P.path;
+  $("#planStats").innerHTML = `<b>${P.count}</b> completed · <b>${P.credits}</b> credit hours · <b>${ready}</b> available now`
+    + (path ? ` · <b>${path.needed.size}</b> ${path.needed.size === 1 ? "course" : "courses"} to go for ${plural(path.goals.length, "goal")}${path.steps.length > 1 ? ` (${path.steps.length} steps)` : ""}` : "");
+  $("#btnPlanPanel").setAttribute("aria-pressed", String(plan.panel && !state.selected));
 }
 function render() {
   syncControls();
@@ -1276,6 +1525,7 @@ function buildExport(kind, onlyFilter) {
       programs: state.programs.filter(p => programs.includes(p)),
       courses: list.map(c => ({ code: c.code, name: c.name, semester: c.semester, term: semLabel(c.semester), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs })),
     };
+    if (plan.completed.size || plan.goals.length) data.plan = { completed: [...plan.completed].sort(cmpCode), goals: plan.goals.slice() };
     return { filename: base + ".json", data: JSON.stringify(data, null, 2) + "\n", mime: "application/json" };
   }
   if (kind === "csv") {
@@ -1320,7 +1570,7 @@ function renderMenu() {
   const fn = f ? visibleCourses().length : 0;
   const fname = f === MANUAL ? "added by hand" : shortProg(f);
   let h = `<button type="button" role="menuitem" data-img="1"><b>Image · PNG / SVG</b><small>High-resolution flowchart of the shown courses, a highlighted tree or the pinned course's chain.</small></button><hr>
-    <button type="button" role="menuitem" data-dl="json"><b>JSON · all ${n} courses</b><small>Everything, including programs. Import it again to pick up where you left off.</small></button>
+    <button type="button" role="menuitem" data-dl="json"><b>JSON · all ${n} courses</b><small>Everything, including programs and your plan (completed and goal courses). Import it again to pick up where you left off.</small></button>
     <button type="button" role="menuitem" data-dl="csv"><b>CSV spreadsheet</b><small>One row per course, for Excel or Sheets. Imports back too.</small></button>
     <button type="button" role="menuitem" data-dl="txt"><b>Text lines</b><small>One line per course, grouped by semester. Pastes back into Line input.</small></button>`;
   if (f && fn) h += `<hr><button type="button" role="menuitem" data-dl="json" data-only="1"><b>JSON · only ${esc(fname)}</b><small>The ${plural(fn, "course")} currently shown.</small></button>`;
@@ -1654,6 +1904,7 @@ function setTheme(t, remember = true) {
   if (remember) try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* not remembered */ }
 }
 
+if (PDF_IMPORT) $("#fileInput").accept += ",.pdf,application/pdf";
 $("#fileInput").addEventListener("change", e => importFiles(e.target.files));
 document.addEventListener("click", e => {
   const a = e.target.closest("[data-action]");
@@ -1694,6 +1945,15 @@ else {
   $("#btnTheme").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"));
 }
 $("#modeSeg").addEventListener("click", e => { const b = e.target.closest("[data-mode]"); if (b) setMode(b.dataset.mode); });
+$("#planSeg").addEventListener("click", e => { const b = e.target.closest("[data-plan]"); if (b && (b.dataset.plan === "1") !== plan.on) setPlanOn(b.dataset.plan === "1"); });
+$("#brushSeg").addEventListener("click", e => { const b = e.target.closest("[data-brush]"); if (b) setBrush(b.dataset.brush); });
+$("#btnPlanPanel").addEventListener("click", () => {
+  const show = !(plan.panel && !state.selected);
+  plan.panel = show;
+  savePlan();
+  if (state.selected) select(null); else { renderDetails(); applyHighlight(); }
+  syncPlanbar();
+});
 $("#btnUndoImport").addEventListener("click", () => {
   if (!lastUndo) return;
   const u = lastUndo;
@@ -1766,9 +2026,15 @@ cards.addEventListener("click", e => {
   const c = e.target.closest(".card");
   if (!c) { if (state.selected) select(null); return; }
   if (e.shiftKey) { setHighlight(c.dataset.code, state.highlights.some(h => h.code === c.dataset.code) ? null : "pre"); return; }
+  if (plan.on && plan.brush === "done") { toggleDone(c.dataset.code); return; }
+  if (plan.on && plan.brush === "goal") { toggleGoal(c.dataset.code); return; }
   select(state.selected === c.dataset.code ? null : c.dataset.code, { fromCard: true });
 });
-cards.addEventListener("dblclick", e => { const c = e.target.closest(".card"); if (c && !e.shiftKey) { clearTimeout(drawerTimer); select(c.dataset.code); openEdit(c.dataset.code); } });
+cards.addEventListener("dblclick", e => {
+  const c = e.target.closest(".card");
+  if (!c || e.shiftKey || (plan.on && plan.brush !== "pin")) return; // in plan mode a double-click is two marks
+  clearTimeout(drawerTimer); select(c.dataset.code); openEdit(c.dataset.code);
+});
 cards.addEventListener("focusin", e => { const c = e.target.closest(".card"); if (c && c.matches(":focus-visible")) { state.hovered = c.dataset.code; applyHighlight(); } });
 cards.addEventListener("focusout", () => { if (state.hovered) { state.hovered = null; applyHighlight(); } });
 
@@ -1778,7 +2044,31 @@ $("#details").addEventListener("click", e => {
   const hlb = e.target.closest("[data-hl]");
   if (hlb) { setHighlight(state.selected, hlb.dataset.hl); return; }
   if (e.target.closest("#dZoom")) { const s = state.selected; zoomToCodes([...closure(s, view.preds), ...closure(s, view.succs)]); return; }
-  if (e.target.closest("#dClose")) { select(null); return; }
+  if (e.target.closest("#dClose")) {
+    if (!state.selected) { plan.panel = false; savePlan(); renderDetails(); syncPlanbar(); return; }
+    if (plan.on) { plan.panel = false; savePlan(); }
+    select(null); syncPlanbar(); return;
+  }
+  if (e.target.closest("#dBack")) { plan.panel = true; savePlan(); select(null); syncPlanbar(); return; }
+  if (e.target.closest("#dDone")) { toggleDone(state.selected); return; }
+  if (e.target.closest("#dGoal")) { toggleGoal(state.selected); return; }
+  const ug = e.target.closest("[data-ungoal]");
+  if (ug) { plan.goals = plan.goals.filter(g => g !== ug.dataset.ungoal); planChanged(); return; }
+  if (e.target.closest("#pClearGoals")) {
+    const undo = plan.goals.slice();
+    plan.goals = []; planChanged();
+    showToast("Cleared goals", 5000, { label: "Undo", run: () => { plan.goals = undo; planChanged(); } });
+    return;
+  }
+  const cd = e.target.closest("#pClearDone");
+  if (cd) {
+    arm(cd, `Clear all ${plan.completed.size}?`, () => {
+      const undo = new Set(plan.completed);
+      plan.completed.clear(); planChanged();
+      showToast("Cleared completed courses", 6000, { label: "Undo", run: () => { plan.completed = undo; planChanged(); } });
+    });
+    return;
+  }
   if (e.target.closest("#dEdit")) { openEdit(state.selected); return; }
   const del = e.target.closest("#dDelete");
   if (del) arm(del, "Confirm delete", () => deleteCourse(state.selected));
@@ -1961,6 +2251,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "-" && !e.ctrlKey && !e.metaKey) zoomBy(1 / 1.3);
   else if (e.key === "0") fitAll();
   else if (e.key === "1") zoomBy(1 / zoom);
+  else if (e.key === "p" && !e.ctrlKey && !e.metaKey) setPlanOn(!plan.on);
   else if (e.key === "h" && state.selected) setHighlight(state.selected, state.highlights.some(h => h.code === state.selected) ? null : "pre");
 });
 
