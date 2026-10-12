@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PrereqFlow</title>
+<meta name="description" content="Course prerequisite flowcharts. Ships with all 16 Ontario Tech engineering program maps (2026-2027); import your own courses as text, JSON or CSV.">
+<link rel="preload" href="assets/fonts/mononoki-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/mononoki-Bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/style.css">
+<script>try { const t = localStorage.getItem("prereqflow.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <div class="brand">
+      <div class="wordmark">PREREQ<span>/</span>FLOW</div>
+      <div class="sheetinfo" id="sheetInfo">NO COURSES LOADED</div>
+    </div>
+    <div class="tools">
+      <div class="search" id="searchWrap" hidden>
+        <input id="search" type="search" placeholder="find course  [/]" autocomplete="off" spellcheck="false" aria-label="Find a course by code or name">
+        <span class="count" id="searchCount"></span>
+      </div>
+      <select class="ctl" id="programFilter" aria-label="Show courses from" hidden></select>
+      <div class="seg" id="modeSeg" role="radiogroup" aria-label="Layout">
+        <button type="button" role="radio" data-mode="semester" aria-checked="true" title="Columns are semesters, as listed in the program map">Semesters</button>
+        <button type="button" role="radio" data-mode="free" aria-checked="false" title="Columns come from the prerequisite graph; every prerequisite sits left of the course that needs it">Free flow</button>
+      </div>
+      <select class="ctl" id="semCount" aria-label="Number of semesters">
+        <option value="4">4 sem</option><option value="6">6 sem</option><option value="8" selected>8 sem</option><option value="10">10 sem</option><option value="12">12 sem</option>
+      </select>
+      <span class="sep"></span>
+      <button class="btn" id="btnImport" type="button">Import</button>
+      <div class="menu-wrap">
+        <button class="btn" id="btnExport" type="button" aria-haspopup="true" aria-expanded="false" disabled>Export <span class="k">▾</span></button>
+        <div class="menu" id="exportMenu" role="menu" hidden></div>
+      </div>
+      <button class="btn" id="btnAdd" type="button">+ Course</button>
+      <button class="btn ghost" id="btnHome" type="button" title="Back to the start screen">Start over</button>
+      <button class="btn theme" id="btnTheme" type="button" title="Switch between the dark and light sheet">Light</button>
+    </div>
+  </header>
+
+  <div class="strip" id="strip">
+    <div class="legend" aria-label="Legend">
+      <span class="k"><span class="sw f"></span>hovered / pinned</span>
+      <span class="k"><span class="sw n"></span>needs</span>
+      <span class="k"><span class="sw u"></span>unlocks</span>
+      <span class="k"><svg viewBox="0 0 26 8" aria-hidden="true"><path d="M1 4h24" stroke="var(--ink-2)" stroke-width="1.4"/></svg>required</span>
+      <span class="k"><svg viewBox="0 0 26 8" aria-hidden="true"><path d="M1 4h24" stroke="var(--ink-2)" stroke-width="1.4" stroke-dasharray="4 3"/></svg>either / or</span>
+      <span class="k" id="legendProg" hidden><b>×3</b>&nbsp;in 3 programs</span>
+    </div>
+    <span class="hint" id="hint">hover: trace · click: pin · shift+click: highlight tree · dbl-click: edit · ctrl+wheel: zoom · shift+drag: zoom to area</span>
+    <div class="trees" id="trees" hidden></div>
+  </div>
+
+  <main class="stage" id="stage">
+    <div class="colhead" id="colhead" aria-hidden="true"></div>
+    <div class="viewport" id="viewport">
+      <div class="sizer" id="sizer">
+        <div class="world" id="world">
+          <div id="zones"></div>
+          <svg class="edges" id="edges" aria-hidden="true">
+            <defs id="markers"></defs>
+            <g id="edgesBase"></g>
+            <g id="edgesHi"></g>
+          </svg>
+          <div class="cards" id="cards"></div>
+        </div>
+      </div>
+    </div>
+    <div class="marquee" id="marquee" hidden></div>
+    <div class="zoombar" id="zoombar" hidden>
+      <button type="button" id="zOut" aria-label="Zoom out" title="Zoom out  [-]">−</button>
+      <button type="button" class="pct" id="zPct" title="Actual size  [1]">100%</button>
+      <button type="button" id="zIn" aria-label="Zoom in" title="Zoom in  [+]">+</button>
+      <button type="button" id="zFit" title="Fit to screen  [0]">FIT</button>
+    </div>
+    <div class="readout" id="readout" hidden></div>
+    <aside class="details" id="details" hidden aria-label="Course details"></aside>
+    <div class="empty" id="empty" hidden>
+      <div>
+        <p>No courses on the sheet.</p>
+        <div class="row">
+          <button class="btn primary" type="button" data-action="home">Start screen</button>
+          <button class="btn" type="button" data-action="paste">Line input</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<input type="file" id="fileInput" multiple accept=".json,.csv,.txt,.md,.pdf,application/json,text/csv,text/plain,application/pdf" hidden>
+
+<!-- Welcome -->
+<div class="overlay" id="welcomeDlg" hidden>
+  <div class="dialog welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="tb">
+      <div>
+        <h1 id="welcomeTitle">PREREQ/FLOW</h1>
+        <p>Course prerequisite flowcharts: every prerequisite drawn as a link, traced on hover.</p>
+      </div>
+      <div><span class="lbl">sheet</span><span id="wDate" class="mono"></span></div>
+    </div>
+    <div class="opts">
+      <section class="opt">
+        <span class="tag">[A] built in</span>
+        <h3>Ontario Tech Engineering<br>16 program maps · 2026–2027</h3>
+        <p id="wDefaultInfo">All engineering programs and specializations, parsed from the official program maps.</p>
+        <label class="lbl" for="wProgram">Start with</label>
+        <select class="ctl" id="wProgram"></select>
+        <div class="row"><button class="btn primary" type="button" id="wDefault">Open program maps</button></div>
+      </section>
+      <section class="opt">
+        <span class="tag">[B] your own</span>
+        <h3>Import your own courses</h3>
+        <p>Type or paste one course per line, or load a <code>.json</code> / <code>.csv</code> you exported from PrereqFlow earlier.</p>
+        <div class="row">
+          <button class="btn" type="button" id="wLines">Line input</button>
+          <button class="btn" type="button" id="wFile">Load .json / .csv</button>
+        </div>
+        <p class="note">Direct program-map (PDF) parsing only works for Ontario Tech program maps, and all of those are already built in under [A].</p>
+      </section>
+    </div>
+    <div class="resume" id="wResume" hidden>
+      <button class="btn" type="button" id="wResumeBtn">Resume last session</button>
+      <span id="wResumeInfo"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Import dialog -->
+<div class="overlay" id="importDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <header><h2 id="importTitle">Import courses</h2><button class="xbtn" type="button" data-close aria-label="Close">×</button></header>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabPaste" aria-selected="true" type="button">Line input</button>
+      <button class="tab" role="tab" id="tabFiles" aria-selected="false" type="button">File</button>
+    </div>
+    <div class="dbody" id="panePaste">
+      <p class="help">One course per line: <code>CODE Name (prerequisites)</code>. Commas separate required courses, <code>or</code> marks alternatives, <code>Coreq:</code> marks corequisites. A line such as <code>2-1</code> or <code>Year 2 Semester 1</code> sets the semester for the courses after it; otherwise the course level is used (2000-level → 2-1). Paste many lines at once and each course lands on its own row. <span class="kbd">Enter</span> adds a row.</p>
+      <div class="prow-head"><span>Sem</span><span>Course line</span><span></span></div>
+      <div class="prows" id="prows"></div>
+      <button class="addrow" type="button" id="addRow">+ add row</button>
+      <details class="skipped" id="skipped" hidden><summary></summary><ul></ul></details>
+    </div>
+    <div class="dbody" id="paneFiles" hidden>
+      <div class="drop" id="dlgDrop">
+        <div class="row"><button class="btn primary" type="button" data-action="choose">Choose files</button></div>
+        <small>PrereqFlow <b>.json</b> or <b>.csv</b> exports, or <b>.txt</b> with one course per line. Drop them here or anywhere on the page. New courses merge with what's loaded; a course listed in two semesters keeps the earliest.</small>
+      </div>
+      <p class="note" style="margin-top:12px">Program-map PDFs: direct parsing only supports the Ontario Tech engineering program-map layout, and all 16 of those maps are already built in (Start over → [A]). Other PDFs: copy their text into Line input instead.</p>
+      <p class="status" id="fileStatus" aria-live="polite"></p>
+    </div>
+    <footer id="pasteFooter">
+      <button class="btn primary" type="button" id="btnAddRows" disabled>Add courses</button>
+      <button class="btn ghost" type="button" id="btnClearRows">Clear rows</button>
+      <span class="spacer"></span>
+      <span class="status" id="pasteStatus"></span>
+    </footer>
+  </div>
+</div>
+
+<!-- Import report -->
+<div class="overlay" id="reportDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+    <header><h2 id="reportTitle">Import summary</h2><button class="xbtn" type="button" data-close aria-label="Close">×</button></header>
+    <div class="dbody" id="reportBody"></div>
+    <footer>
+      <button class="btn primary" type="button" data-close>Done</button>
+      <span class="spacer"></span>
+      <button class="btn ghost" type="button" id="btnUndoImport">Undo this import</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Add / edit course -->
+<div class="overlay" id="editDlg" hidden>
+  <div class="dialog narrow" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <header><h2 id="editTitle">Add course</h2><button class="xbtn" type="button" data-close aria-label="Close">×</button></header>
+    <form class="dbody form" id="editForm" novalidate>
+      <div class="two">
+        <label>Course code<input id="fCode" autocomplete="off" placeholder="ELEE 3180U" required></label>
+        <label>Semester<select id="fSem"></select></label>
+      </div>
+      <label>Course name<input id="fName" autocomplete="off" placeholder="Design Principles &amp; Project Management" required></label>
+      <label>Prerequisites<input id="fPre" autocomplete="off" placeholder="ELEE 2250U, ELEE 2530U or MATH 2860U">
+        <span class="hint">Commas separate required courses; "or" marks alternatives.</span></label>
+      <label>Corequisites<input id="fCo" autocomplete="off" placeholder="ELEE 3240U"><span class="hint">Drawn like prerequisites.</span></label>
+      <p class="err" id="fErr" aria-live="polite"></p>
+      <button type="submit" hidden></button>
+    </form>
+    <footer>
+      <button class="btn primary" type="button" id="fSave">Save</button>
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <span class="spacer"></span>
+      <button class="btn danger" type="button" id="fDelete" hidden>Delete course</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Image export -->
+<div class="overlay" id="imageDlg" hidden>
+  <div class="dialog narrow" role="dialog" aria-modal="true" aria-labelledby="imageTitle">
+    <header><h2 id="imageTitle">Export image</h2><button class="xbtn" type="button" data-close aria-label="Close">×</button></header>
+    <form class="dbody form" id="imageForm" novalidate>
+      <fieldset>
+        <legend>Courses</legend>
+        <div class="choices" id="imgScope"></div>
+        <span class="hint" id="imgScopeHint"></span>
+      </fieldset>
+      <fieldset>
+        <legend>Resolution</legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="imgScale" value="2"><span>2×</span></label>
+          <label class="choice"><input type="radio" name="imgScale" value="3" checked><span>3×</span></label>
+          <label class="choice"><input type="radio" name="imgScale" value="4"><span>4×</span></label>
+          <label class="choice"><input type="radio" name="imgScale" value="6"><span>6×</span></label>
+        </div>
+      </fieldset>
+      <div class="two">
+        <fieldset>
+          <legend>Sheet</legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="imgTheme" value="dark" checked><span>Dark</span></label>
+            <label class="choice"><input type="radio" name="imgTheme" value="light"><span>Light / print</span></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Format</legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="imgFormat" value="png" checked><span>PNG</span></label>
+            <label class="choice"><input type="radio" name="imgFormat" value="svg"><span>SVG</span></label>
+          </div>
+        </fieldset>
+      </div>
+      <label class="check"><input type="checkbox" id="imgTitle" checked>Title block and legend</label>
+      <label class="check"><input type="checkbox" id="imgHl" checked>Keep tree highlights</label>
+      <p class="dims" id="imgDims"></p>
+    </form>
+    <footer>
+      <button class="btn primary" type="button" id="imgGo">Export</button>
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <span class="spacer"></span>
+      <span class="status" id="imgStatus"></span>
+    </footer>
+  </div>
+</div>
+
+<!-- Copy fallback -->
+<div class="overlay" id="copyDlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
+    <header><h2 id="copyTitle">Copy data</h2><button class="xbtn" type="button" data-close aria-label="Close">×</button></header>
+    <div class="dbody">
+      <p class="help" id="copyMsg"></p>
+      <textarea class="dump" id="copyText" readonly spellcheck="false" aria-label="Exported data"></textarea>
+    </div>
+    <footer><button class="btn primary" type="button" id="btnCopy">Copy to clipboard</button><button class="btn ghost" type="button" data-close>Close</button></footer>
+  </div>
+</div>
+
+<div class="dropveil" id="dropVeil" hidden><div>Drop to import</div></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="data/ontario-tech-engineering-2026-2027.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/image.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
