@@ -214,6 +214,13 @@ There are two sheets, night (dark) and paper (light). Both use warm neutrals ins
 of pure black and white, one periwinkle/apricot pair for tracing needs/unlocks, and
 six pastel hues for tree highlights. All text is set in mononoki.
 
+The colours come from the master palette shared with
+[areeb-ece.github.io](https://areeb-ece.github.io/) and OTU Calendar:
+`/design/tokens.css`, kept in the portfolio repo at `public/design/tokens.css`. The page
+loads it after `css/style.css`, so changing it there restyles all three sites. The values
+in `css/style.css` are a fallback for when the page is opened offline or from disk, and
+image export reads the master palette too.
+
 ### Ambient motion
 
 Each card runs a Web Animations float (a sum of whole-number harmonics of one 11 s
