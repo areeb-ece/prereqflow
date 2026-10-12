@@ -1,0 +1,13 @@
+{
+  "name": "prereqflow",
+  "version": "2.0.0",
+  "description": "Course prerequisite flowcharts, with all 16 Ontario Tech engineering program maps built in.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "build:data": "node scripts/build-data.js",
+    "check:data": "node scripts/build-data.js --check",
+    "serve": "python3 -m http.server 8080"
+  }
+}
