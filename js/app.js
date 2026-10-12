@@ -1330,12 +1330,38 @@ function openMenu() { renderMenu(); $("#exportMenu").hidden = false; $("#btnExpo
 function closeMenu() { $("#exportMenu").hidden = true; $("#btnExport").setAttribute("aria-expanded", "false"); }
 
 // ───────────────────────── image export ─────────────────────────
-// mirrors the CSS custom properties, so the export can use either sheet
+// mirrors the CSS custom properties, so the export can use either sheet; when the shared
+// master palette (/design/tokens.css) has loaded, its colours are used instead (exportPalette)
 const PALETTE = {
-  dark: { sheet: "#1D2027", head: "#1A1D23", card: "#23272F", ink: "#E8E4DC", ink2: "#BAB5AB", ink3: "#8C8880", rule: "#353A45", rule2: "#2A2E37", zoneAlt: "rgba(150,175,235,0.025)", edge: "#4D5362", back: "#EE9585", accent: "#A3B8F0", h: ["#9FD4AB", "#C4A9F2", "#F0A391", "#EACB76", "#7DCBC4", "#EBA3C6"] },
+  dark: { sheet: "#17191E", head: "#14161A", card: "#1C1F25", ink: "#F1EDE5", ink2: "#CAC5BB", ink3: "#A29E96", rule: "#2E323B", rule2: "#23262D", zoneAlt: "rgba(150,175,235,0.025)", edge: "#4D5362", back: "#EE9585", accent: "#A3B8F0", h: ["#9FD4AB", "#C4A9F2", "#F0A391", "#EACB76", "#7DCBC4", "#EBA3C6"] },
   light: { sheet: "#F6F3EC", head: "#FAF8F3", card: "#FFFFFF", ink: "#2F2D36", ink2: "#5D5967", ink3: "#8A8592", rule: "#DDD7CB", rule2: "#E8E3D9", zoneAlt: "rgba(80,105,190,0.03)", edge: "#BDB6AA", back: "#C2564A", accent: "#4F67C6", h: ["#3F8D5B", "#7A58C4", "#C65A45", "#A9831B", "#2B8A84", "#B6508A"] },
 };
 const SITE = "areeb-ece.github.io/prereqflow";
+
+// Reads a sheet's colours from the master palette through a hidden probe element (the
+// master defines both sheets on [data-theme] too). Falls back to PALETTE offline.
+function exportPalette(theme) {
+  const base = PALETTE[theme] || PALETTE.dark;
+  const probe = document.createElement("div");
+  probe.dataset.theme = theme === "light" ? "light" : "dark";
+  probe.hidden = true;
+  document.body.append(probe);
+  const cs = getComputedStyle(probe);
+  const v = name => cs.getPropertyValue(name).trim();
+  let out = base;
+  if (v("--master")) {
+    const pick = (name, fallback) => v(name) || fallback;
+    out = {
+      ...base,
+      sheet: pick("--sheet-2", base.sheet), head: pick("--sheet", base.head), card: pick("--card", base.card),
+      ink: pick("--ink", base.ink), ink2: pick("--ink-2", base.ink2), ink3: pick("--ink-3", base.ink3),
+      rule: pick("--rule", base.rule), rule2: pick("--rule-2", base.rule2), back: pick("--danger", base.back), accent: pick("--accent", base.accent),
+      h: base.h.map((c, i) => pick(`--h${i}`, c)),
+    };
+  }
+  probe.remove();
+  return out;
+}
 
 function imageScopes() {
   const sel = state.selected && view && view.nodes.has(state.selected) ? state.selected : null;
@@ -1387,7 +1413,7 @@ function updateImageDims() {
 
 // layout + styles → drawing operations (see image.js)
 function buildImageSpec(o) {
-  const P = PALETTE[o.theme] || PALETTE.dark;
+  const P = exportPalette(o.theme);
   const scope = imageScopes().find(s => s.id === o.scope) || imageScopes()[0];
   let lay = view;
   if (scope.codes) {
