@@ -131,7 +131,10 @@ planning. Turning plan mode off only hides the plan; nothing is cleared.
 - **◎ goal**: click a course to make it a goal. The courses still needed for all goals
   are marked **step 1, step 2, …** and their links light up. Step 1 is what you can take
   now; each later step only needs earlier ones (corequisites can share a step). For an
-  either/or requirement the option with the fewest courses left is used, and a course
+  either/or requirement a completed option counts; otherwise an option in the program
+  shown comes first (in the all-programs view, the one sharing the most programs with
+  the course that needs it), then one the path already takes, then the one with the
+  fewest courses left. The plan panel lists every either/or pick it made. A course
   with a credit threshold moves back until enough courses come before it.
 - **pin**: click to open a course's details, which also have **Mark completed** and
   **Set as goal** buttons.

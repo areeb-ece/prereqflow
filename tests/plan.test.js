@@ -117,3 +117,35 @@ test("goal path: completed goals need nothing", () => {
   assert.equal(P.needed.size, 0);
   assert.deepEqual(P.doneGoals, ["ENGR 1015U"]);
 });
+
+test("either/or in a goal path: the option in the shown program wins", () => {
+  // Power Systems needs Electric Machines (Electrical) or MECE 3410U (Energy only)
+  const done = new Set(firstYear(ELEC));
+  const P = PFPlan.plan(all, done, ["ELEE 3260U"], ELEC);
+  assert.ok(P.needed.has("ELEE 3250U") && !P.needed.has("MECE 3410U"));
+  assert.equal(P.step.get("ELEE 3250U"), P.step.get("ELEE 3260U") - 1, "Electric Machines is the last step before Power Systems");
+  for (const x of P.needed) assert.ok(all.get(x).programs.includes(ELEC), `${x} is an Electrical course`);
+  assert.ok(P.picks.some(k => k.course === "ELEE 3260U" && k.picked === "ELEE 3250U" && k.over.includes("MECE 3410U")));
+  // with Energy shown, Energy's option wins
+  const E = PFPlan.plan(all, done, ["ELEE 3260U"], "Energy Engineering 2026-2027");
+  assert.ok(E.needed.has("MECE 3410U") && !E.needed.has("ELEE 3250U"));
+  // all programs: the option most of Power Systems' programs use
+  assert.ok(PFPlan.plan(all, done, ["ELEE 3260U"], "").needed.has("ELEE 3250U"));
+  // a completed option settles it, whichever program is shown
+  const viaMece = PFPlan.plan(all, new Set([...done, "MECE 3410U"]), ["ELEE 3260U"], ELEC);
+  assert.deepEqual([...viaMece.needed], ["ELEE 3260U"]);
+});
+
+test("either/or in a goal path: every goal in a program stays inside it when it can", () => {
+  for (const prog of data.programs) {
+    const list = inProgram(prog);
+    for (const goal of list) {
+      const P = PFPlan.plan(all, new Set(), [goal.code], prog);
+      for (const k of P.picks) {
+        const g = [k.picked, ...k.over];
+        if (g.some(x => all.get(x).programs.includes(prog))) assert.ok(all.get(k.picked).programs.includes(prog), `${shortName(prog)} → ${goal.code}: ${k.picked} over ${k.over}`);
+      }
+    }
+  }
+});
+const shortName = p => p.replace(/ 2026-2027$/, "");

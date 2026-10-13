@@ -94,12 +94,19 @@ const PFPlan = (() => {
 
   // The courses still needed for the goals, grouped into steps: everything in step 1
   // can be taken now, and each later step only needs earlier steps (corequisites may
-  // share a step). Where a requirement offers alternatives, the one with the fewest
-  // courses still to do is picked. Credit thresholds push a course back until enough
-  // courses come before it; if the plan alone can't reach the threshold, `short` says
-  // how many more courses (electives, say) are needed.
+  // share a step). Where a requirement offers alternatives (either/or), a completed
+  // option settles it; otherwise the pick prefers, in order:
+  //   1. an option in the program shown
+  //   2. an option that shares more programs with the course that needs it (in the
+  //      all-programs view this picks the route most of that course's programs take)
+  //   3. an option the plan already takes for something else
+  //   4. the option with the fewest courses still to do, then the earlier semester
+  // Credit thresholds push a course back until enough courses come before it; if the
+  // plan alone can't reach the threshold, `short` says how many more courses
+  // (electives, say) are needed.
   // → { steps: [[codes]], step: Map code → step, needed: Set, goals, doneGoals,
-  //     short: Map code → courses, pools: Map code → years pool }
+  //     short: Map code → courses, pools: Map code → years pool,
+  //     picks: [{ course, picked, over: [codes] }] (each either/or choice made) }
   function plan(courses, completed, goals, program = "") {
     const done = x => completed.has(x);
     const loaded = x => courses.has(x);
@@ -119,23 +126,39 @@ const PFPlan = (() => {
       onStack.add(code);
       const c = courses.get(code);
       let n = 1;
-      for (const g of [...(c.prereqs || []), ...(c.coreqs || [])]) if (open(g)) n += Math.min(...g.filter(loaded).map(cost));
+      for (const g of [...(c.prereqs || []), ...(c.coreqs || [])]) if (open(g)) n += cost(choose(g, c));
       if (rules(c).yearsComplete) n += poolOf(c).left.length;
       onStack.delete(code);
       memo.set(code, n);
       return n;
     }
-    const pick = g => g.filter(loaded).sort((a, b) => cost(a) - cost(b) || courses.get(a).semester - courses.get(b).semester || cmpCode(a, b))[0];
+    const needed = new Set(), pre = new Map(), co = new Map(), picks = [];
+    function choose(g, owner) {
+      const opts = g.filter(loaded);
+      if (opts.length < 2) return opts[0];
+      const own = owner.programs || [];
+      const rank = x => {
+        const progs = courses.get(x).programs || [];
+        return [program && progs.includes(program) ? 0 : 1, -own.filter(p => progs.includes(p)).length, needed.has(x) ? 0 : 1, cost(x), courses.get(x).semester];
+      };
+      const byRank = ([a, x], [b, y]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return cmpCode(x, y); };
+      return opts.map(x => [rank(x), x]).sort(byRank)[0][1];
+    }
+    const pick = (g, owner) => {
+      const x = choose(g, owner);
+      const over = g.filter(y => y !== x && loaded(y));
+      if (over.length) picks.push({ course: owner.code, picked: x, over });
+      return x;
+    };
 
-    const needed = new Set(), pre = new Map(), co = new Map();
     function collect(code) {
       if (done(code) || needed.has(code) || !loaded(code)) return;
       needed.add(code);
       const c = courses.get(code);
       const p = [], q = [];
       pre.set(code, p); co.set(code, q);
-      for (const g of c.prereqs || []) if (open(g)) { const x = pick(g); p.push(x); collect(x); }
-      for (const g of c.coreqs || []) if (open(g)) { const x = pick(g); q.push(x); collect(x); }
+      for (const g of c.prereqs || []) if (open(g)) { const x = pick(g, c); p.push(x); collect(x); }
+      for (const g of c.coreqs || []) if (open(g)) { const x = pick(g, c); q.push(x); collect(x); }
       if (rules(c).yearsComplete) for (const x of poolOf(c).left) { p.push(x); collect(x); }
     }
     const goalList = [...new Set(goals)].filter(loaded);
@@ -197,7 +220,7 @@ const PFPlan = (() => {
     for (const x of needed) { const k = renum.get(step.get(x)); step.set(x, k); steps[k - 1].push(x); }
     for (const s of steps) s.sort((a, b) => courses.get(a).semester - courses.get(b).semester || cmpCode(a, b));
     const usedPools = new Map([...pools].filter(([code]) => needed.has(code)));
-    return { steps, step, needed, goals: goalList, doneGoals: goalList.filter(done), short, pools: usedPools };
+    return { steps, step, needed, goals: goalList, doneGoals: goalList.filter(done), short, pools: usedPools, picks };
   }
 
   return { CREDITS, rules, evaluate, plan, yearsPool };
