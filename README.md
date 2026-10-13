@@ -194,8 +194,15 @@ session.
 **Export → Image** draws a high-resolution flowchart:
 
 - **Courses**: everything shown, only the highlighted trees, the pinned course's
-  chain, or exactly the visible area. Trees and chains get a fresh compact layout of
+  chain, the **goal path** (goals, the courses still needed and the completed courses
+  leading in), or exactly the visible area. Trees, chains and the goal path get a fresh compact layout of
   their own.
+- **Show the plan**: draws the sheet as plan mode does: completed courses in green,
+  available ones ringed, goals and path courses with their step numbers, the path's
+  links lit, and credit/Capstone progress on locked courses. A band under the chart
+  lists the goal path step by step, the title line adds completed / credit hours /
+  available counts, and the legend explains the marks. It's on by default in plan mode
+  and works with every course choice, PNG or SVG.
 - **Resolution**: 2×, 3×, 4× or 6× PNG. The scale steps down automatically if it
   would exceed the browser's canvas limits. **SVG** gives a vector copy with the font
   embedded.

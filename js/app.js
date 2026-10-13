@@ -1569,7 +1569,7 @@ function renderMenu() {
   const n = state.courses.size, f = state.filter;
   const fn = f ? visibleCourses().length : 0;
   const fname = f === MANUAL ? "added by hand" : shortProg(f);
-  let h = `<button type="button" role="menuitem" data-img="1"><b>Image · PNG / SVG</b><small>High-resolution flowchart of the shown courses, a highlighted tree or the pinned course's chain.</small></button><hr>
+  let h = `<button type="button" role="menuitem" data-img="1"><b>Image · PNG / SVG</b><small>High-resolution flowchart of the shown courses, a highlighted tree, the pinned course's chain or your goal path, with your plan (completed, available, goals) if you like.</small></button><hr>
     <button type="button" role="menuitem" data-dl="json"><b>JSON · all ${n} courses</b><small>Everything, including programs and your plan (completed and goal courses). Import it again to pick up where you left off.</small></button>
     <button type="button" role="menuitem" data-dl="csv"><b>CSV spreadsheet</b><small>One row per course, for Excel or Sheets. Imports back too.</small></button>
     <button type="button" role="menuitem" data-dl="txt"><b>Text lines</b><small>One line per course, grouped by semester. Pastes back into Line input.</small></button>`;
@@ -1583,8 +1583,8 @@ function closeMenu() { $("#exportMenu").hidden = true; $("#btnExport").setAttrib
 // mirrors the CSS custom properties, so the export can use either sheet; when the shared
 // master palette (/design/tokens.css) has loaded, its colours are used instead (exportPalette)
 const PALETTE = {
-  dark: { sheet: "#17191E", head: "#14161A", card: "#1C1F25", ink: "#F1EDE5", ink2: "#CAC5BB", ink3: "#A29E96", rule: "#2E323B", rule2: "#23262D", zoneAlt: "rgba(150,175,235,0.025)", edge: "#4D5362", back: "#EE9585", accent: "#A3B8F0", h: ["#9FD4AB", "#C4A9F2", "#F0A391", "#EACB76", "#7DCBC4", "#EBA3C6"] },
-  light: { sheet: "#F6F3EC", head: "#FAF8F3", card: "#FFFFFF", ink: "#2F2D36", ink2: "#5D5967", ink3: "#8A8592", rule: "#DDD7CB", rule2: "#E8E3D9", zoneAlt: "rgba(80,105,190,0.03)", edge: "#BDB6AA", back: "#C2564A", accent: "#4F67C6", h: ["#3F8D5B", "#7A58C4", "#C65A45", "#A9831B", "#2B8A84", "#B6508A"] },
+  dark: { sheet: "#17191E", head: "#14161A", card: "#1C1F25", ink: "#F1EDE5", ink2: "#CAC5BB", ink3: "#A29E96", rule: "#2E323B", rule2: "#23262D", zoneAlt: "rgba(150,175,235,0.025)", edge: "#4D5362", back: "#EE9585", accent: "#A3B8F0", ok: "#9FD4AB", goal: "#EACB76", h: ["#9FD4AB", "#C4A9F2", "#F0A391", "#EACB76", "#7DCBC4", "#EBA3C6"] },
+  light: { sheet: "#F6F3EC", head: "#FAF8F3", card: "#FFFFFF", ink: "#2F2D36", ink2: "#5D5967", ink3: "#8A8592", rule: "#DDD7CB", rule2: "#E8E3D9", zoneAlt: "rgba(80,105,190,0.03)", edge: "#BDB6AA", back: "#C2564A", accent: "#4F67C6", ok: "#3F8D5B", goal: "#A9831B", h: ["#3F8D5B", "#7A58C4", "#C65A45", "#A9831B", "#2B8A84", "#B6508A"] },
 };
 const SITE = "areeb-ece.github.io/prereqflow";
 
@@ -1623,7 +1623,8 @@ function exportPalette(theme) {
       rule: pick("--rule", base.rule), rule2: pick("--rule-2", base.rule2), back: pick("--danger", base.back), accent: pick("--accent", base.accent),
       h: base.h.map((c, i) => pick(`--h${i}`, c)),
     };
-    if (cur) Object.assign(out, { zoneAlt: pick("--zone-alt", base.zoneAlt), edge: pick("--edge", base.edge) });
+    // --ok and --goal are the page's own (css/style.css sets them on :root only), so only "current" can read them
+    if (cur) Object.assign(out, { zoneAlt: pick("--zone-alt", base.zoneAlt), edge: pick("--edge", base.edge), ok: pick("--ok", base.ok), goal: pick("--goal", base.goal) });
   }
   probe.remove();
   return out;
@@ -1636,20 +1637,34 @@ function imageScopes() {
   const chain = sel ? [...new Set([...closure(sel, view.preds), ...closure(sel, view.succs)])] : [];
   const vis = view ? view.visible.length : 0;
   const filt = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : (state.programs.length > 1 ? `all ${state.programs.length} programs` : "all courses");
+  // the goals, the courses still needed for them, and the completed courses that lead straight in
+  const path = view && state.courses.size ? planInfo().path : null;
+  let pathCodes = [];
+  if (path) {
+    const on = new Set([...path.goals, ...path.needed].filter(c => view.nodes.has(c)));
+    for (const c of [...on]) for (const p of view.preds.get(c)) if (plan.completed.has(p)) on.add(p);
+    pathCodes = [...on];
+  }
   return [
     { id: "view", label: `Shown · ${vis}`, hint: `Every course on the sheet (${filt}).`, codes: null, ok: vis > 0 },
     { id: "trees", label: `Highlighted trees · ${treeSet.size}`, hint: hs.length ? `Trees of ${hs.map(h => h.code).join(", ")}, laid out on their own.` : "Highlight a tree first (shift+click a course, or use the course panel).", codes: [...treeSet], ok: treeSet.size > 0 },
     { id: "chain", label: sel ? `${sel} chain · ${chain.length}` : "Pinned course chain", hint: sel ? `${sel} with everything it needs and unlocks, laid out on its own.` : "Click a course to pin it first.", codes: chain, ok: chain.length > 0 },
     { id: "window", label: "Visible area", hint: "Exactly the part of the sheet on screen, at the current layout.", codes: null, ok: vis > 0 },
+    { id: "path", label: `Goal path · ${pathCodes.length}`, hint: path ? `Goals ${path.goals.join(", ")}, the courses still needed for them and the completed courses leading in, laid out on their own.` : "Set a goal in plan mode first.", codes: pathCodes, ok: pathCodes.length > 0, plan: true },
   ];
 }
 function openImageDlg() {
   closeMenu();
   const scopes = imageScopes();
   const prev = ($("input[name=imgScope]:checked") || {}).value;
-  const pick = (scopes.find(s => s.id === prev && s.ok) || scopes.find(s => s.id === (state.highlights.length ? "trees" : "view") && s.ok) || scopes[0]).id;
+  const want = plan.on && scopes.find(s => s.id === "path").ok ? "path" : state.highlights.length ? "trees" : "view";
+  const pick = (scopes.find(s => s.id === prev && s.ok) || scopes.find(s => s.id === want && s.ok) || scopes[0]).id;
   $("#imgScope").innerHTML = scopes.map(s => `<label class="choice"><input type="radio" name="imgScope" value="${s.id}"${s.ok ? "" : " disabled"}${s.id === pick ? " checked" : ""}><span>${esc(s.label)}</span></label>`).join("");
   $("#imgHl").disabled = !state.highlights.length;
+  const hasPlan = plan.completed.size > 0 || plan.goals.length > 0;
+  $("#imgPlan").disabled = !hasPlan;
+  $("#imgPlan").checked = hasPlan && plan.on;
+  $("#imgPlanHint").textContent = hasPlan ? "(completed, available now, goals and the path to them)" : "(mark courses completed or set a goal in plan mode first)";
   $("#imgStatus").textContent = "";
   updateImageDims();
   openDialog("#imageDlg");
@@ -1659,6 +1674,7 @@ function imageOptions() {
   return {
     scope: val("imgScope") || "view", scale: +(val("imgScale") || 3), theme: val("imgTheme") || "current",
     format: val("imgFormat") || "png", title: $("#imgTitle").checked, hl: $("#imgHl").checked && state.highlights.length > 0,
+    plan: !$("#imgPlan").disabled && ($("#imgPlan").checked || val("imgScope") === "path"),
   };
 }
 function updateImageDims() {
@@ -1695,11 +1711,17 @@ function buildImageSpec(o) {
   }
   const trees = o.hl ? treeSets(lay, state.highlights) : { cards: new Map(), edges: new Map(), roots: new Map(), any: false };
   const dim = trees.any && state.dimOthers;
+  // the plan, drawn as in plan mode: card states and badges, the goal path's links lit
+  const PI = o.plan ? planInfo() : null;
+  const goals = PI && PI.path;                                 // goal marks and step numbers
+  const path = goals && goals.needed.size && !trees.any ? goals : null; // dims what's off the path
   const ops = [];
   const W = Math.max(cw, 420);
   const titleH = o.title ? 84 : 0, headH = 40, footH = 40; // the footer (with the credit) is always drawn
   const top = titleH + headH;
-  const H = top + chH + footH;
+  const band = planBand(goals, W - 2 * D.padL - 120);
+  const bandH = band.length ? 34 + band.length * 18 : 0;
+  const H = top + chH + bandH + footH;
   const X = x => x - cx, Y = y => y - cy + top; // layout → image
 
   // column zones (under the chart) and header (over it, so a crop scrolls beneath)
@@ -1725,12 +1747,14 @@ function buildImageSpec(o) {
   const edgeOps = [], hiOps = [];
   lay.edges.forEach((e, i) => {
     const hc = trees.edges.has(i) ? P.h[trees.edges.get(i)] : null;
-    const color = e.kind === "back" ? P.back : hc || P.edge;
-    const a = dim && !hc ? 0.2 : 1;
+    const onPath = !!path && path.needed.has(e.from) && path.needed.has(e.to);
+    const lit = hc || (onPath ? P.goal : null);
+    const color = e.kind === "back" ? P.back : lit || P.edge;
+    const a = (dim && !hc) || (path && !onPath) ? 0.2 : 1;
     const dash = e.kind === "back" ? [2, 3] : e.alt ? [5, 4] : null;
-    const list = hc ? hiOps : edgeOps;
-    list.push({ t: "path", d: shiftPath(e.d, -cx, top - cy), stroke: color, sw: hc ? 2 : 1.2, dash, a });
-    list.push({ t: "arrow", x: X(e.arrow.x), y: Y(e.arrow.y), dir: e.arrow.dir, color, size: hc ? 8 : 7, a });
+    const list = lit ? hiOps : edgeOps;
+    list.push({ t: "path", d: shiftPath(e.d, -cx, top - cy), stroke: color, sw: lit ? 2 : 1.2, dash, a });
+    list.push({ t: "arrow", x: X(e.arrow.x), y: Y(e.arrow.y), dir: e.arrow.dir, color, size: lit ? 8 : 7, a });
   });
   ops.push(...edgeOps, ...hiOps);
 
@@ -1741,22 +1765,55 @@ function buildImageSpec(o) {
     if (x > W || x + n.w < 0 || y > top + chH || y + n.h < top) continue;
     const tc = trees.cards.get(c.code);
     const hc = tc ? P.h[tc[0]] : null;
-    const a = dim && !hc ? 0.28 : 1;
+    const pc = PI ? planCard(c.code, PI, goals, path, P) : null;
+    const a = Math.min(dim && !hc ? 0.28 : 1, pc ? pc.a : 1);
+    if (pc && pc.ring) ops.push({ t: "rect", x: x - 3, y: y - 3, w: n.w + 6, h: n.h + 6, r: 13, stroke: pc.ring, sw: 3, a: 0.32 * a });
     ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: P.card, a });
     if (hc) ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: hc, a: 0.1 });
-    ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, stroke: hc || P.rule, sw: trees.roots.has(c.code) ? 2.2 : 1, a });
+    else if (pc && pc.tint) ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, fill: pc.tint, a: 0.1 * a });
+    const border = hc || (pc && pc.border) || P.rule;
+    ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, stroke: border, sw: trees.roots.has(c.code) ? 2.2 : pc && !hc ? pc.sw : 1, dash: !hc && pc ? pc.dash : null, a: a * (!hc && pc ? pc.ba : 1) });
     ops.push({ t: "text", x: x + 10, y: y + 19, text: c.code, size: 12.5, weight: 700, color: hc || P.ink, a });
-    if (c.programs.length > 1) ops.push({ t: "text", x: x + n.w - 10, y: y + 19, text: `×${c.programs.length}`, size: 10.5, color: P.ink3, anchor: "end", a });
-    PFImage.wrap(c.name, n.w - 20, 11, 400, 2).forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11, color: P.ink2, a }));
+    if (pc && pc.badge) { // the plan badge takes the corner, as on screen
+      const bw = PFImage.measure(pc.badge, 10, 700) + 12;
+      ops.push({ t: "rect", x: x + n.w - 7 - bw, y: y + 7, w: bw, h: 15, r: 7.5, fill: pc.badgeColor, a: 0.16 * a });
+      ops.push({ t: "text", x: x + n.w - 13, y: y + 18, text: pc.badge, size: 10, weight: 700, color: pc.badgeColor, anchor: "end", a });
+    } else if (!PI) {
+      let xr = x + n.w - 10;
+      if (c.programs.length > 1) {
+        ops.push({ t: "text", x: xr, y: y + 19, text: `×${c.programs.length}`, size: 10.5, color: P.ink3, anchor: "end", a });
+        xr -= PFImage.measure(`×${c.programs.length}`, 10.5) + 6;
+      }
+      const rq = ruleTag(c);
+      if (rq) {
+        const tw = PFImage.measure(rq.text, 10) + 10;
+        ops.push({ t: "rect", x: xr - tw, y: y + 8, w: tw, h: 14, r: 4, stroke: P.rule, sw: 1, a });
+        ops.push({ t: "text", x: xr - 5, y: y + 18.5, text: rq.text, size: 10, color: P.ink3, anchor: "end", a });
+      }
+    }
+    PFImage.wrap(c.name, n.w - 20, 11, 400, 2).forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11, color: pc && pc.done ? P.ink3 : P.ink2, a }));
     if (tc) tc.forEach((ci, i) => ops.push({ t: "rect", x: x + n.w - 6 - 10 * (tc.length - i), y: y + n.h - 12, w: 7, h: 7, r: 3.5, fill: P.h[ci] }));
   }
   ops.push(...chrome);
+
+  // the goal path, step by step, under the chart
+  if (band.length) {
+    const by = top + chH;
+    ops.push({ t: "rect", x: 0, y: by, w: W, h: bandH, fill: P.head });
+    ops.push({ t: "path", d: `M0,${by + 0.5} H${W}`, stroke: P.rule2, sw: 1 });
+    band.forEach((l, i) => {
+      const ly = by + 26 + i * 18;
+      if (l.label) ops.push({ t: "text", x: D.padL, y: ly, text: l.label, size: 11.5, weight: 700, color: l.head ? P.ink3 : P.goal, ls: l.head ? 1.2 : 0 });
+      ops.push({ t: "text", x: D.padL + 120, y: ly, text: l.text, size: 11.5, weight: l.head ? 700 : 400, color: l.head ? P.ink : l.note ? P.ink3 : P.ink2 });
+    });
+  }
 
   // title block
   if (o.title) {
     const prog = state.filter ? (state.filter === MANUAL ? "Added by hand" : shortProg(state.filter)) : state.programs.length > 1 ? `All ${state.programs.length} programs` : state.programs.length ? shortProg(state.programs[0]) : "Courses";
     const what = scope.id === "trees" ? `highlighted trees: ${state.highlights.filter(h => lay.nodes.has(h.code)).map(h => `${h.code} (${DIRS[h.dir]})`).join(", ")}`
-      : scope.id === "chain" ? `prerequisite chain of ${state.selected}` : scope.id === "window" ? "visible area" : "full sheet";
+      : scope.id === "chain" ? `prerequisite chain of ${state.selected}` : scope.id === "window" ? "visible area"
+      : scope.id === "path" ? `goal path to ${goals.goals.join(", ")}` : PI ? "full sheet with plan" : "full sheet";
     ops.push({ t: "rect", x: 0, y: 0, w: W, h: titleH, fill: P.head });
     ops.push({ t: "path", d: `M0,${titleH - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
     const pre = "PREREQ", sl = "/";
@@ -1765,7 +1822,8 @@ function buildImageSpec(o) {
     ops.push({ t: "text", x: x1, y: 32, text: sl, size: 19, color: P.accent });
     ops.push({ t: "text", x: x1 + PFImage.measure(sl, 19) + 3, y: 32, text: "FLOW", size: 19, weight: 700, color: P.ink, ls: 3 });
     ops.push({ t: "text", x: D.padL, y: 54, text: `${prog} · ${what}`, size: 12.5, color: P.ink2 });
-    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")} · ${today()}`, size: 11.5, color: P.ink3 });
+    const planLine = PI ? ` · ${PI.count} completed (${PI.credits} credit hours) · ${view.visible.filter(v => PI.status.get(v.code).state === "ready").length} available now${goals && goals.needed.size ? ` · ${goals.needed.size} to go for ${plural(goals.goals.length, "goal")}` : ""}` : "";
+    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")}${planLine} · ${today()}`, size: 11.5, color: P.ink3 });
     // credit badge, top right
     const by = "made by areeb";
     const bw = Math.max(PFImage.measure(by, 16, 700), PFImage.measure(SITE, 13, 400)) + 32;
@@ -1795,12 +1853,57 @@ function buildImageSpec(o) {
       ops.push({ t: "text", x: lx, y: ly, text, size: 11.5, color: P.ink3 });
       lx += w - 34 + 24;
     };
+    if (PI) { // plan first: it's what this image is about
+      const sw = (x, extra) => ops.push({ t: "rect", x: x + 5, y: ly - 10, w: 16, h: 11, r: 3, fill: P.card, ...extra });
+      item(x => { sw(x, {}); ops.push({ t: "rect", x: x + 5, y: ly - 10, w: 16, h: 11, r: 3, fill: P.ok, a: 0.18 }); ops.push({ t: "rect", x: x + 5, y: ly - 10, w: 16, h: 11, r: 3, stroke: P.ok, sw: 1.5, a: 0.7 }); }, "completed");
+      item(x => { sw(x, {}); ops.push({ t: "rect", x: x + 3, y: ly - 12, w: 20, h: 15, r: 5, stroke: P.accent, sw: 2, a: 0.32 }); ops.push({ t: "rect", x: x + 5, y: ly - 10, w: 16, h: 11, r: 3, stroke: P.accent, sw: 1.5 }); }, "available now");
+      if (goals) item(x => { sw(x, {}); ops.push({ t: "rect", x: x + 5, y: ly - 10, w: 16, h: 11, r: 3, stroke: P.goal, sw: 1.5, dash: [3, 2] }); }, "goal path");
+      if (path) item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.goal, sw: 2 }), "path link");
+    }
     item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.5 }), "required");
     item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink2, sw: 1.5, dash: [4, 3] }), "either / or");
     if (lay.edges.some(e => e.kind === "back")) item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.back, sw: 1.5, dash: [2, 3] }), "listed out of order");
     if (lay.mode === "free") item(x => ops.push({ t: "path", d: `M${x},${ly - 4} H${x + 26}`, stroke: P.ink3, sw: 1 }), "prerequisites always sit to the left");
   }
   return { width: W, height: H, bg: P.sheet, ops };
+}
+// how a card looks in plan mode (mirrors the p-* classes in css/style.css)
+function planCard(code, PI, goals, path, P) {
+  const st = PI.status.get(code);
+  if (!st) return null;
+  const goal = !!goals && goals.goals.includes(code), step = goals && goals.step.get(code);
+  const out = { a: 1, sw: 1, ba: 1, dash: null, border: null, ring: null, tint: null, badge: "", badgeColor: P.ink3, done: st.state === "done" };
+  if (st.state === "done") Object.assign(out, { tint: P.ok, border: P.ok, ba: 0.6 });
+  else if (st.state === "ready") Object.assign(out, { border: P.accent, sw: 1.4, ring: P.accent });
+  else out.a = 0.6;
+  if (goal) Object.assign(out, { a: 1, border: P.goal, ba: 1, sw: 1.8, ring: P.goal });
+  else if (step) Object.assign(out, { a: 1, border: P.goal, ba: 1, sw: 1.4, dash: [4, 3] });
+  else if (path && st.state !== "done") out.a = 0.38;
+  if (goal) Object.assign(out, { badge: step ? `◎ goal · ${step}` : st.state === "done" ? "◎ ✓ done" : "◎ goal", badgeColor: P.goal });
+  else if (st.state === "done") Object.assign(out, { badge: "✓ done", badgeColor: P.ok });
+  else if (step) Object.assign(out, { badge: `step ${step}`, badgeColor: P.goal });
+  else if (st.state === "ready") Object.assign(out, { badge: "available", badgeColor: P.accent });
+  else if (st.creditsShort) out.badge = `${PI.credits}/${st.minCredits} cr`;
+  else if (st.years && st.years.left.length) out.badge = `${st.years.left.length} left`;
+  return out;
+}
+// the goal path as lines of text for the band under an exported chart
+function planBand(goals, maxW) {
+  if (!goals || !goals.goals.length) return [];
+  const lines = [{ label: "GOAL PATH", text: `◎ ${goals.goals.join(", ")} · ${goals.needed.size ? `${plural(goals.needed.size, "course")} to go in ${plural(goals.steps.length, "step")}` : "nothing left to take"}`, head: true }];
+  const fit = (codes, label) => { // codes never break across lines
+    let cur = "";
+    for (const c of codes) {
+      const next = cur ? `${cur}, ${c}` : c;
+      if (cur && PFImage.measure(next, 11.5) > maxW) { lines.push({ label, text: cur + "," }); label = ""; cur = c; } else cur = next;
+    }
+    if (cur) lines.push({ label, text: cur });
+  };
+  const P = planInfo();
+  goals.steps.forEach((list, i) => fit(list, `Step ${i + 1}${i === 0 && list.every(x => P.status.get(x).state === "ready") ? " · now" : ""}`));
+  if (goals.doneGoals.length) lines.push({ label: "", text: `Already completed: ${goals.doneGoals.join(", ")}`, note: true });
+  for (const [code, n] of goals.short) lines.push({ label: "", text: `${code} needs ${PFPlan.rules(state.courses.get(code)).minCredits} credit hours: ${plural(n, "more course")} (electives count) before it`, note: true });
+  return lines;
 }
 // move every x,y pair of an SVG path by (dx, dy)
 function shiftPath(d, dx, dy) {
@@ -1815,7 +1918,8 @@ async function runImageExport() {
   $("#imgStatus").innerHTML = `<span class="spin"></span>rendering…`;
   try {
     const spec = buildImageSpec(o);
-    const scope = o.scope === "trees" ? "-trees" : o.scope === "chain" ? `-${slug(state.selected || "chain")}` : o.scope === "window" ? "-area" : "";
+    const scope = (o.scope === "trees" ? "-trees" : o.scope === "chain" ? `-${slug(state.selected || "chain")}` : o.scope === "window" ? "-area" : o.scope === "path" ? "-goal-path" : "")
+      + (o.plan && o.scope !== "path" ? "-plan" : "");
     const base = `${fileBase(true)}${scope}-${state.mode}`;
     if (o.format === "svg") {
       const fonts = await fontData();
