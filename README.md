@@ -6,8 +6,10 @@ Course prerequisite flowcharts in the browser. Every course is a card and every
 prerequisite is a link, so you can see what a course needs and what it unlocks.
 
 All **16 Ontario Tech University engineering program maps (2026–2027)** are built in:
-158 courses and 266 prerequisite links. You can also bring your own courses as typed
-lines or as a JSON/CSV file exported from PrereqFlow earlier.
+158 courses and 266 prerequisite links. **Plan mode** lets you tick off the courses
+you've finished, see what you can take now, and set goal courses to get the courses
+still needed for them, in order. You can also bring your own courses as typed lines or
+as a JSON/CSV/text file exported from PrereqFlow earlier.
 
 It's a static site with no build step, no framework and no server. Open `index.html`
 and it runs.
@@ -22,6 +24,7 @@ five-course chain that starts in first year. PrereqFlow draws that structure so
 students and advisors can:
 
 - see the full prerequisite chain behind a course, and everything it unlocks
+- mark completed courses and see what is available next, or plan a route to a goal
 - check whether a missed or failed course delays later semesters
 - compare programs and specializations that share courses
 - export a clean, high-resolution flowchart for planning or presentation
@@ -47,12 +50,11 @@ Each visit opens on a start screen with two choices:
 
 - **[A] Ontario Tech Engineering**: load the 16 built-in program maps. You can
   start with all of them or pick a single program.
-- **[B] Your own courses**: open **Line input**, or load a `.json` / `.csv` that you
-  exported from PrereqFlow earlier.
+- **[B] Your own courses**: open **Line input**, or load a `.json` / `.csv` / `.txt`
+  (for example one you exported from PrereqFlow earlier).
 
-Direct parsing of program-map PDFs only supports the Ontario Tech program-map
-layout, and all of those maps are already built in. For anything else, paste the
-course text into Line input.
+Every Ontario Tech engineering program map is built in, so PDFs aren't imported.
+For other course lists, paste the text into Line input.
 
 If a previous session is saved in the browser, a **Resume last session** button
 appears as well.
@@ -101,6 +103,46 @@ out of a PDF. Each course ends up on its own row and is checked as you type.
 | **shift + click** | highlight that course's prerequisite **tree** |
 | double-click | edit the course |
 | `/` | search by code or name |
+| `p` | switch between Explore and Plan |
+
+Three requirements aren't plain course lists, and are shown on the card as a small tag:
+
+- **Capstone Systems Design I** (`Y1–3`) needs every program course in years 1–3.
+  Every year 1–3 course shown (all of them in the all-programs view) links to it. So
+  that those links don't tangle with the rest, they leave each card into the gap on
+  its right, drop to a bus that runs under the whole sheet, and rise into Capstone,
+  which sits at the bottom of its column.
+- **Engineering Economics** (`54 cr`) needs at least 54 credit hours and **Ethics, Law
+  and Professionalism** (`84 cr`) at least 84. These have no links, since no fixed set of
+  courses makes up the credits; every course counts as 3 credit hours. (Computer
+  Networks' "54 credit hours" note is read the same way.)
+
+### Plan mode
+
+**Explore / Plan** in the toolbar switches between analysing the program maps and
+planning. Turning plan mode off only hides the plan; nothing is cleared.
+
+- **✓ completed** (the default): click a course to mark it completed, and again to
+  unmark it. Courses you can take now get a blue ring and an **available** tag;
+  locked courses fade back. A course is available when every prerequisite group has a
+  completed course (one is enough for either/or), each corequisite is completed or
+  available, the credit threshold is met (completed courses × 3) and, for Capstone,
+  every year 1–3 course is done.
+- **◎ goal**: click a course to make it a goal. The courses still needed for all goals
+  are marked **step 1, step 2, …** and their links light up. Step 1 is what you can take
+  now; each later step only needs earlier ones (corequisites can share a step). For an
+  either/or requirement the option with the fewest courses left is used, and a course
+  with a credit threshold moves back until enough courses come before it.
+- **pin**: click to open a course's details, which also have **Mark completed** and
+  **Set as goal** buttons.
+
+The **plan panel** lists your goals, the path to them step by step, and every course
+available now. Completions count everywhere: a course marked in Mechanical is also
+completed in Electrical and the all-programs view. For Capstone, the program shown
+decides which year 1–3 courses count; in the all-programs view it's the program with
+the fewest left. The plan is saved in the browser, separately from the sheet, so it
+survives reloads, **Start over** and program switches, and a JSON export carries it
+too.
 
 ### Zoom and navigation
 
@@ -163,7 +205,9 @@ session.
   shown as a badge in the title block and in the footer.
 
 **Export → JSON / CSV / Text lines** saves the course data. All three import back
-into PrereqFlow, so a JSON export is also how you save and share a plan.
+into PrereqFlow. A JSON export also carries your plan (completed and goal courses),
+which is added to the current plan on import, so it's how you move a plan to another
+browser.
 
 ## How it works
 
@@ -173,13 +217,14 @@ css/style.css                 soft drafting-sheet theme (night + paper fallback)
 js/theme.js                   offline fallback: remembered light/dark sheet and motion
 js/parser.js        PF        course text / PDF table → course records
 js/layout.js        PFLayout  course records → card positions + routed links
+js/plan.js          PFPlan    completed + goal courses → availability and goal path
 js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
-js/app.js                     state, import, rendering, zoom, highlights, export
+js/app.js                     state, import, rendering, zoom, highlights, plan, export
 data/*.json                   built-in Ontario Tech data (PrereqFlow export format)
 data/*.js                     the same data wrapped for <script> loading (generated)
 assets/fonts/                 mononoki (SIL Open Font License)
 scripts/build-data.js         regenerates data/*.js from data/*.json
-tests/                        node:test suites for the parser and layout
+tests/                        node:test suites for the parser, layout and planner
 ```
 
 ### Parsing (`js/parser.js`)
@@ -217,6 +262,12 @@ Both views use a Sugiyama-style layered graph drawing:
    towards a tight, centred stack stops the sheet from drifting taller than needed.
 5. **Routing.** Link ends are spread along card edges in the order of the other
    end, and links are drawn as horizontal-tangent cubic curves through their lanes.
+
+Capstone's years 1–3 links are **bus links**: they count for free-flow columns (so
+Capstone stays right of everything it needs) but take no part in lanes, ordering,
+crossings or placement. They're routed last as right angles with rounded corners:
+a riser in the gutter right of each source column, one bus below the lowest card, and
+a rise into the target from the gutter on its left.
 
 The tests check the free-flow guarantee (prerequisites strictly left) against all 16
 programs, the combined view, and data containing corequisites and cycles.
@@ -266,28 +317,31 @@ renders it either to a `<canvas>` at the chosen scale or to SVG.
 ### Storage
 
 The session (courses, layout mode, filter and highlights) is saved in `localStorage`
-in your browser only, and so are the display settings (shared with the other sites on
-areeb-ece.github.io). Nothing is uploaded anywhere.
+in your browser only, and so is the plan (completed and goal courses, under its own
+key so starting over never clears it) and the display settings (shared with the other
+sites on areeb-ece.github.io). Nothing is uploaded anywhere.
 
 ## Development
 
 ```sh
-npm test               # parser + layout tests (node:test, no dependencies)
+npm test               # parser, layout + planner tests (node:test, no dependencies)
 npm run build:data     # regenerate data/*.js after editing data/*.json
 npm run check:data     # verify data/*.js matches data/*.json (run in CI)
 ```
 
-To update the built-in programs, load the new program-map PDFs in the app, export
+To update the built-in programs: set `PDF_IMPORT = true` in `js/app.js` (the PDF
+reader is kept but switched off), load the new program-map PDFs in the app, export
 JSON, replace `data/ontario-tech-engineering-2026-2027.json` and run
-`npm run build:data`.
+`npm run build:data`. Then add back the credit-hour notes on ENGR 3360U and ENGR 4760U
+if the maps still leave them out, and switch `PDF_IMPORT` off again.
 
 ## Credits
 
 - Made by **areeb**: [areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/).
 - Typeface: [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
   SIL Open Font License 1.1 (`assets/fonts/OFL-mononoki.txt`).
-- PDF reading: [pdf.js](https://mozilla.github.io/pdf.js/), loaded from a CDN only
-  when a PDF is imported.
+- PDF reading (switched off; used to build the data): [pdf.js](https://mozilla.github.io/pdf.js/),
+  loaded from a CDN only when a PDF is imported.
 - Course data: Ontario Tech University program maps, 2026–2027. Always check the
   official academic calendar before you plan.
 

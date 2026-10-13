@@ -14,17 +14,24 @@
  *   4. place     vertical positions by isotonic regression towards neighbours,
  *                so links run as straight as the stacking allows
  *   5. route     ports spread along card edges; cubic links through the lanes
+ *
+ * A course with `yearsComplete: N` (Capstone: "all program courses in years one
+ * through three") needs every shown course of semesters 1…2N. Those links are "bus"
+ * links: they take no part in ordering or placement, and run from each card's right
+ * edge down a riser in the gutter, along a bus under the whole sheet, and up into
+ * the course, so they stay clear of the ordinary links.
  */
 const PFLayout = (() => {
   "use strict";
 
-  const DIMS = { colW: 196, cardH: 64, laneH: 4, gapY: 12, gapLane: 5, gutter: 76, padL: 24, padR: 40, padT: 20, padB: 56 };
+  const DIMS = { colW: 196, cardH: 64, laneH: 4, gapY: 12, gapLane: 5, gutter: 76, padL: 24, padR: 40, padT: 20, padB: 56, busGap: 30 };
   const COMPACT = 0.6; // pull towards the tight stack, relative to one linked neighbour
   const cmpCode = (a, b) => a.localeCompare(b, "en", { numeric: true });
 
   // ── graph ────────────────────────────────────────────────────────────────
   // Links between visible courses. A link is "alt" when every group naming the
-  // prerequisite offers an alternative (either/or), "co" when it is a corequisite.
+  // prerequisite offers an alternative (either/or), "co" when it is a corequisite,
+  // "bus" when it comes from a yearsComplete requirement.
   function buildGraph(courses) {
     const vis = new Map(courses.map(c => [c.code, c]));
     const preds = new Map(), succs = new Map(), edgeMap = new Map();
@@ -41,6 +48,18 @@ const PFLayout = (() => {
           preds.get(c.code).push(p);
           succs.get(p).push(c.code);
         }
+      }
+    }
+    for (const c of courses) {
+      if (!(c.yearsComplete > 0)) continue;
+      const lim = c.yearsComplete * 2;
+      for (const o of courses) {
+        if (o.code === c.code || o.yearsComplete > 0 || (o.semester || 1) > lim) continue;
+        const key = o.code + "→" + c.code;
+        if (edgeMap.has(key)) continue;
+        edgeMap.set(key, { from: o.code, to: c.code, alt: false, co: false, bus: true });
+        preds.get(c.code).push(o.code);
+        succs.get(o.code).push(c.code);
       }
     }
     return { vis, preds, succs, edges: [...edgeMap.values()] };
@@ -71,8 +90,9 @@ const PFLayout = (() => {
   // Longest-path layering puts each course one column right of its latest
   // prerequisite. Then courses that unlock more than they need are pulled right,
   // next to their earliest dependent, which shortens links without ever moving
-  // a course left of (or level with) one of its prerequisites.
-  function freeColumns(codes, preds, succs) {
+  // a course left of (or level with) one of its prerequisites. Bus links count for
+  // the ordering but not for that pull: their length doesn't matter.
+  function freeColumns(codes, preds, succs, bus = new Set()) {
     const sorted = [...codes].sort(cmpCode);
     const back = backEdges(sorted, succs);
     const P = new Map(), S = new Map();
@@ -96,7 +116,8 @@ const PFLayout = (() => {
       let moved = false;
       for (let i = topo.length - 1; i >= 0; i--) {
         const c = topo[i], out = S.get(c), inn = P.get(c);
-        if (!out.length || out.length <= inn.length) continue;
+        const own = out.filter(s => !bus.has(c + "→" + s)).length;
+        if (!own || own <= inn.filter(p => !bus.has(p + "→" + c)).length) continue;
         const lim = Math.min(...out.map(s => layer.get(s))) - 1;
         if (lim > layer.get(c)) { layer.set(c, lim); moved = true; }
       }
@@ -153,7 +174,7 @@ const PFLayout = (() => {
 
     let col, back = new Set();
     if (mode === "free") {
-      const f = freeColumns(codes, g.preds, g.succs);
+      const f = freeColumns(codes, g.preds, g.succs, new Set(g.edges.filter(e => e.bus).map(e => e.from + "→" + e.to)));
       col = f.layer; back = f.back;
     } else {
       col = new Map(courses.map(c => [c.code, Math.max(0, (c.semester || 1) - 1)]));
@@ -170,6 +191,7 @@ const PFLayout = (() => {
     for (const e of g.edges) {
       const ca = col.get(e.from), cb = col.get(e.to);
       const r = { ...e, kind: cb > ca ? "fwd" : cb === ca ? "same" : "back", hops: [] };
+      if (e.bus) r.kind = "bus";
       if (back.has(e.from + "→" + e.to)) r.kind = "back";
       if (r.kind === "fwd") {
         let prev = e.from;
@@ -192,16 +214,19 @@ const PFLayout = (() => {
     for (const s of segList) segsBetween[items.get(s[0]).col].push(s);
 
     // ── 3. order within columns
+    // courses fed by the bus sit at the bottom of their column, next to the bus
+    const sink = new Set(routes.filter(r => r.kind === "bus").map(r => r.to));
+    const sunk = (a, b) => sink.has(a) - sink.has(b);
     const cols = Array.from({ length: nCols }, () => []);
     for (const it of items.values()) cols[it.col].push(it.id);
     const idx = new Map();
     const reindex = c => cols[c].forEach((id, i) => idx.set(id, i));
     // initial: column 0 by code, then each column by the mean position of what feeds it
-    cols[0].sort(cmpCode);
+    cols[0].sort((a, b) => sunk(a, b) || cmpCode(a, b));
     reindex(0);
     for (let k = 1; k < nCols; k++) {
       const bc = id => { const u = up.get(id); return u.length ? u.reduce((s, x) => s + idx.get(x), 0) / u.length : Infinity; };
-      cols[k].sort((a, b) => (bc(a) - bc(b)) || cmpCode(a, b));
+      cols[k].sort((a, b) => sunk(a, b) || (bc(a) - bc(b)) || cmpCode(a, b));
       reindex(k);
     }
     const crossingsAt = k => countCrossings(segsBetween[k], a => idx.get(a), b => idx.get(b));
@@ -212,7 +237,7 @@ const PFLayout = (() => {
         const ns = nbrs.get(id);
         bc.set(id, ns.length ? ns.reduce((s, x) => s + idx.get(x), 0) / ns.length : i);
       });
-      cols[k].sort((a, b) => bc.get(a) - bc.get(b) || idx.get(a) - idx.get(b));
+      cols[k].sort((a, b) => sunk(a, b) || bc.get(a) - bc.get(b) || idx.get(a) - idx.get(b));
       reindex(k);
     };
     // swap neighbours in a column while that removes crossings with both sides
@@ -231,6 +256,7 @@ const PFLayout = (() => {
           const c = cols[k];
           for (let i = 0; i + 1 < c.length; i++) {
             const a = c[i], b = c[i + 1];
+            if (sink.has(a) !== sink.has(b)) continue;
             if (localCross(b, a) < localCross(a, b)) {
               c[i] = b; c[i + 1] = a; idx.set(b, i); idx.set(a, i + 1); improved = true;
             }
@@ -308,6 +334,21 @@ const PFLayout = (() => {
       spread(c, up.get(c), x => x + "|" + c, portIn);
       spread(c, down.get(c), x => c + "|" + x, portOut);
     }
+    // bus links: one riser per source column, one bus per target, one rise per target
+    const busTargets = [...new Set(routes.filter(r => r.kind === "bus").map(r => r.to))].sort(cmpCode);
+    const busY = new Map(busTargets.map((t, i) => [t, Math.round(bottom + shift + D.busGap + i * 10)]));
+    const R = 6;
+    const busPath = (a, b) => {
+      const y0 = a.y + D.cardH - 8, x0 = a.x + D.colW;
+      const rx = x0 + Math.round(D.gutter * 0.32);
+      const tx = b.x - 1, ux = b.x - Math.round(D.gutter * 0.3);
+      const ty = up.get(b.code).length ? b.y + D.cardH - 10 : b.y + D.cardH / 2;
+      const by = busY.get(b.code), sg = ux >= rx ? 1 : -1;
+      // first two points ride with the source card and the last two with the target (see the float in app.js)
+      return `M${f(x0)},${f(y0)} L${f(x0 + 6)},${f(y0)} L${f(rx - R)},${f(y0)} Q${f(rx)},${f(y0)} ${f(rx)},${f(y0 + R)}`
+        + ` L${f(rx)},${f(by - R)} Q${f(rx)},${f(by)} ${f(rx + sg * R)},${f(by)} L${f(ux - sg * R)},${f(by)} Q${f(ux)},${f(by)} ${f(ux)},${f(by - R)}`
+        + ` L${f(ux)},${f(ty + R)} Q${f(ux)},${f(ty)} ${f(ux + R)},${f(ty)} L${f(tx - 6)},${f(ty)} L${f(tx)},${f(ty)}`;
+    };
     const curve = (x1, y1, x2, y2) => {
       const dx = Math.max(24, (x2 - x1) * 0.5);
       return `C${f(x1 + dx)},${f(y1)} ${f(x2 - dx)},${f(y2)} ${f(x2)},${f(y2)}`;
@@ -315,7 +356,10 @@ const PFLayout = (() => {
     const edges = routes.map(r => {
       const a = nodes.get(r.from), b = nodes.get(r.to);
       let d, arrow;
-      if (r.kind === "fwd") {
+      if (r.kind === "bus") {
+        d = busPath(a, b);
+        arrow = { x: b.x - 1, y: up.get(b.code).length ? b.y + D.cardH - 10 : b.y + D.cardH / 2, dir: 1 };
+      } else if (r.kind === "fwd") {
         const ids = [r.from, ...r.hops, r.to];
         let x = a.x + D.colW, y = portOut.get(ids[0] + "|" + ids[1]);
         d = `M${f(x)},${f(y)}`;
@@ -339,13 +383,14 @@ const PFLayout = (() => {
         d = `M${f(x1)},${f(ay)} C${f(x1 - dx)},${f(ay)} ${f(x2 + dx)},${f(by)} ${f(x2)},${f(by)}`;
         arrow = { x: x2, y: by, dir: -1 };
       }
-      return { from: r.from, to: r.to, alt: r.alt, co: r.co, kind: r.kind, d, arrow };
+      return { from: r.from, to: r.to, alt: r.alt, co: r.co, bus: !!r.bus, kind: r.kind, d, arrow };
     });
 
     const colsOut = Array.from({ length: nCols }, () => []);
     for (const n of nodes.values()) colsOut[n.col].push(n.code);
     const width = D.padL + nCols * D.colW + (nCols - 1) * D.gutter + D.padR;
-    const height = Math.max(D.padT + D.cardH + D.padB, Math.round(bottom + shift + D.padB));
+    const lastBus = busTargets.length ? busY.get(busTargets[busTargets.length - 1]) : -Infinity;
+    const height = Math.max(D.padT + D.cardH + D.padB, Math.round(bottom + shift + D.padB), lastBus + D.padB);
     return {
       mode, dims: D, nCols, cols: colsOut, colX, nodes, lanes, edges,
       preds: g.preds, succs: g.succs, width, height, crossings: best,
