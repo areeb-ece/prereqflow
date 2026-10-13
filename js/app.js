@@ -1079,7 +1079,9 @@ function planPanelHtml() {
           const now = list.every(x => P.status.get(x).state === "ready");
           h += `<div class="step"><div class="sh"><b>Step ${i + 1}</b><span>${i === 0 ? (now ? "available now" : "start here") : `after step ${i}`}</span></div>${list.map(x => planItem(x, P)).join("")}</div>`;
         });
-        h += `</div><p class="plain muted" style="margin-top:8px">A step is one round of courses: each only needs earlier steps (corequisites can share one). Where a requirement offers a choice, the option with the fewest courses left is used.</p>`;
+        h += `</div><p class="plain muted" style="margin-top:8px">A step is one round of courses: each only needs earlier steps (corequisites can share one). Where a requirement offers a choice, a completed option counts; otherwise an option in the shown program comes first, then one the path already takes, then the one with the fewest courses left.</p>`;
+        const picks = path.picks.filter(k => path.needed.has(k.course));
+        if (picks.length) h += `<p class="plain muted" style="margin-top:8px">Either/or picks${P.program ? ` (preferring ${esc(shortProg(P.program))} courses)` : ""}: ${picks.map(k => `<b>${esc(k.picked)}</b> for ${esc(k.course)} instead of ${esc(k.over.join(" or "))}`).join("; ")}.</p>`;
         for (const [code, pool] of path.pools) h += `<p class="plain muted" style="margin-top:6px">${esc(code)} needs every year 1–${pool.years} course of ${esc(progName(pool.program))}${!P.program && pool.program ? " (the program with the fewest left)" : ""}: ${plural(pool.left.length, "course")} to go.</p>`;
         for (const [code, n] of path.short) h += `<p class="plain" style="margin-top:6px">${esc(code)} needs ${PFPlan.rules(state.courses.get(code)).minCredits} credit hours: take ${plural(n, "more course")} (electives count) before it.</p>`;
       }
