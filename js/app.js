@@ -363,13 +363,13 @@ function showReport(reports, result, title) {
   const rows = reports.map(r => r.error
     ? `<tr><td>${esc(r.program || r.name)}<div class="muted">${esc(r.name)}</div></td><td colspan="4" class="err">${esc(r.error)}</td></tr>`
     : `<tr><td>${esc(r.program || "Line input")}${r.name && r.name !== r.program ? `<div class="muted">${esc(r.name)} · ${esc(r.mode)}</div>` : ""}</td>
-        <td class="num">${r.courses}</td><td class="num">${r.alts}</td><td class="num">${r.coreqs}</td>
-        <td class="num">${r.electives.length + r.restrictions}</td></tr>`).join("");
+        <td class="num sd-num">${r.courses}</td><td class="num sd-num">${r.alts}</td><td class="num sd-num">${r.coreqs}</td>
+        <td class="num sd-num">${r.electives.length + r.restrictions}</td></tr>`).join("");
   let html = `<p class="rsum"><b>${plural(result.total, "course")}</b> loaded`
     + (result.added ? `, ${result.added} new` : "") + ` from ${plural(ok.length, "source")}.`
     + (result.conflicts.length ? ` ${plural(result.conflicts.length, "course")} appeared in more than one semester; the earliest was kept.` : "") + `</p>`;
-  html += `<div class="rtable-wrap"><table class="rtable"><thead><tr><th>Source</th><th class="num">Courses</th><th class="num">Either/or</th><th class="num">Coreqs</th><th class="num">Skipped</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  html += `<p class="help" style="margin-top:8px">Skipped counts elective slots and credit-restriction notes, which aren't prerequisites.</p>`;
+  html += `<div class="rtable-wrap"><table class="rtable sd-table"><thead><tr><th>Source</th><th class="num sd-num">Courses</th><th class="num sd-num">Either/or</th><th class="num sd-num">Coreqs</th><th class="num sd-num">Skipped</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  html += `<p class="help mt">Skipped counts elective slots and credit-restriction notes, which aren't prerequisites.</p>`;
   if (result.conflicts.length) {
     html += `<div class="rsec"><h3>Semester conflicts · earliest kept</h3><ul>${result.conflicts.map(c =>
       `<li>${esc(c.code)} → <b>${semLabel(c.kept)}</b> <span class="muted">(${esc(trimList(c.all[0].from))})</span>; also listed in ${c.all.slice(1).map(a => `${semLabel(a.sem)} <span class="muted">(${esc(trimList(a.from))})</span>`).join(", ")}</li>`).join("")}</ul></div>`;
@@ -485,7 +485,7 @@ function hashCode(str) {
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-const motionOn = () => document.documentElement.dataset.motion !== "off";
+const motionOn = () => document.documentElement.dataset.motion !== "off" && !reduceMotion; // reduced motion holds the sheet still
 
 // ── ambient float ──
 // Every card bobs on a slow wave that ripples across the sheet, plus a small wobble
@@ -854,7 +854,7 @@ function applyHighlight() {
   let anc = null, desc = null;
   if (focus) { anc = closure(focus, view.preds); desc = closure(focus, view.succs); }
   const matches = q ? new Set(view.visible.filter(c => matchesQuery(c, q)).map(c => c.code)) : null;
-  $("#searchCount").textContent = q ? String(matches.size) : "";
+  $("#searchCount").textContent = q ? (matches.size ? String(matches.size) : "No match") : "";
   const trees = treeSets();
   const P = plan.on ? planInfo() : null;
   const path = P && P.path;
@@ -962,13 +962,13 @@ function renderTrees() {
   box.hidden = !hs.length;
   $("#hint").hidden = !!hs.length;
   if (!hs.length) { box.innerHTML = ""; return; }
-  box.innerHTML = `<span class="lbl">trees</span>` + hs.map(h => {
+  box.innerHTML = `<span class="lbl">Trees</span>` + hs.map(h => {
     const off = view && !view.nodes.has(h.code);
     return `<span class="tree-chip" style="--hc:var(--h${h.color})" data-tree="${esc(h.code)}" title="${off ? "Not in the current program filter" : "Zoom to this tree"}"${off ? ' data-off="1"' : ""}><i></i>${esc(h.code)} <span class="d">${DIRS[h.dir]}</span><button type="button" class="x" data-untree="${esc(h.code)}" aria-label="Remove ${esc(h.code)} highlight">×</button></span>`;
   }).join("")
-    + `<button type="button" class="btn" id="treeDim" aria-pressed="${state.dimOthers}">${state.dimOthers ? "Dim others: on" : "Dim others: off"}</button>`
-    + `<button type="button" class="btn" id="treeZoom">Zoom to trees</button>`
-    + `<button type="button" class="btn ghost" id="treeClear">Clear</button>`;
+    + `<button type="button" class="btn sd-btn sd-small" id="treeDim" aria-pressed="${state.dimOthers}">${state.dimOthers ? "Dim others: on" : "Dim others: off"}</button>`
+    + `<button type="button" class="btn sd-btn sd-small" id="treeZoom">Zoom to trees</button>`
+    + `<button type="button" class="btn ghost sd-btn sd-small sd-ghost" id="treeClear">Clear</button>`;
 }
 
 // ───────────────────────── planning ─────────────────────────
@@ -1055,35 +1055,35 @@ function planPanelHtml() {
   const vis = view ? view.visible : [];
   const doneShown = vis.filter(c => plan.completed.has(c.code)).length;
   const scope = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : `all ${plural(state.programs.length, "program")}`;
-  let h = `<header><span class="dcode">Plan</span><button class="xbtn" type="button" id="dClose" aria-label="Close the plan panel">×</button>
+  let h = `<header><span class="dcode">Plan</span><button class="xbtn sd-x" type="button" id="dClose" aria-label="Close the plan panel">×</button>
     <div class="dname">${plural(P.count, "course")} completed · ${P.credits} credit hours</div>
     <div class="dsem">${doneShown} of ${vis.length} shown completed · ${esc(scope)}</div></header><div class="dbody">`;
   if (!plan.completed.size && !plan.goals.length) {
-    h += `<p class="note" style="margin-top:14px">Click a course to mark it completed; what you can take next lights up. Switch the plan bar to <b>◎ goal</b> and click a course to see, in order, what it takes to get there. Completed courses count in every program, and are kept between visits.</p>`;
+    h += `<p class="note sd-callout">Click a course to mark it completed; what you can take next lights up. Choose <b>Set a goal</b> and click a course to see, in order, what it takes to get there. Completed courses count in every program, and are kept between visits.</p>`;
   }
   // goals and the path to them
   const path = P.path;
   h += `<h3>Goals <span class="ct">${plan.goals.length}</span></h3>`;
-  if (!plan.goals.length) h += `<p class="plain muted">No goals yet. Pick <b>◎ goal</b> in the plan bar, then click a course (or use “Set as goal” on a pinned course).</p>`;
+  if (!plan.goals.length) h += `<p class="plain muted">No goals yet. Choose <b>Set a goal</b> next to “Click a course to”, then click a course (or use “Set as goal” on a pinned course).</p>`;
   else {
     h += `<div class="grp">${plan.goals.map(g => {
       const c = state.courses.get(g);
       return `<span class="gchip${c ? "" : " missing"}" title="${c ? esc(c.name) : "Not in the loaded courses"}">${c ? `<button type="button" class="gl" data-goto="${esc(g)}">◎ ${esc(g)}</button>` : `◎ ${esc(g)}`}<button type="button" class="x" data-ungoal="${esc(g)}" aria-label="Remove goal ${esc(g)}">×</button></span>`;
     }).join("")}</div>`;
     if (path) {
-      if (path.doneGoals.length) h += `<p class="plain muted" style="margin-top:8px">Already completed: ${esc(path.doneGoals.join(", "))}.</p>`;
-      if (!path.needed.size) h += `<p class="plain" style="margin-top:8px">Nothing left to take for ${path.goals.length > 1 ? "these goals" : "this goal"}.</p>`;
+      if (path.doneGoals.length) h += `<p class="plain muted mt">Already completed: ${esc(path.doneGoals.join(", "))}.</p>`;
+      if (!path.needed.size) h += `<p class="plain mt">Nothing left to take for ${path.goals.length > 1 ? "these goals" : "this goal"}.</p>`;
       else {
         h += `<h3>Path, in order <span class="ct">${plural(path.needed.size, "course")}</span></h3><div class="steps">`;
         path.steps.forEach((list, i) => {
           const now = list.every(x => P.status.get(x).state === "ready");
           h += `<div class="step"><div class="sh"><b>Step ${i + 1}</b><span>${i === 0 ? (now ? "available now" : "start here") : `after step ${i}`}</span></div>${list.map(x => planItem(x, P)).join("")}</div>`;
         });
-        h += `</div><p class="plain muted" style="margin-top:8px">A step is one round of courses: each only needs earlier steps (corequisites can share one). Where a requirement offers a choice, a completed option counts; otherwise an option in the shown program comes first, then one the path already takes, then the one with the fewest courses left.</p>`;
+        h += `</div><p class="plain muted mt">A step is one round of courses: each only needs earlier steps (corequisites can share one). Where a requirement offers a choice, a completed option counts; otherwise an option in the shown program comes first, then one the path already takes, then the one with the fewest courses left.</p>`;
         const picks = path.picks.filter(k => path.needed.has(k.course));
-        if (picks.length) h += `<p class="plain muted" style="margin-top:8px">Either/or picks${P.program ? ` (preferring ${esc(shortProg(P.program))} courses)` : ""}: ${picks.map(k => `<b>${esc(k.picked)}</b> for ${esc(k.course)} instead of ${esc(k.over.join(" or "))}`).join("; ")}.</p>`;
-        for (const [code, pool] of path.pools) h += `<p class="plain muted" style="margin-top:6px">${esc(code)} needs every year 1–${pool.years} course of ${esc(progName(pool.program))}${!P.program && pool.program ? " (the program with the fewest left)" : ""}: ${plural(pool.left.length, "course")} to go.</p>`;
-        for (const [code, n] of path.short) h += `<p class="plain" style="margin-top:6px">${esc(code)} needs ${PFPlan.rules(state.courses.get(code)).minCredits} credit hours: take ${plural(n, "more course")} (electives count) before it.</p>`;
+        if (picks.length) h += `<p class="plain muted mt">Either/or picks${P.program ? ` (preferring ${esc(shortProg(P.program))} courses)` : ""}: ${picks.map(k => `<b>${esc(k.picked)}</b> for ${esc(k.course)} instead of ${esc(k.over.join(" or "))}`).join("; ")}.</p>`;
+        for (const [code, pool] of path.pools) h += `<p class="plain muted mt">${esc(code)} needs every year 1–${pool.years} course of ${esc(progName(pool.program))}${!P.program && pool.program ? " (the program with the fewest left)" : ""}: ${plural(pool.left.length, "course")} to go.</p>`;
+        for (const [code, n] of path.short) h += `<p class="plain mt">${esc(code)} needs ${PFPlan.rules(state.courses.get(code)).minCredits} credit hours: take ${plural(n, "more course")} (electives count) before it.</p>`;
       }
     }
   }
@@ -1091,7 +1091,7 @@ function planPanelHtml() {
   const ready = vis.filter(c => P.status.get(c.code).state === "ready").sort((a, b) => a.semester - b.semester || cmpCode(a.code, b.code));
   h += `<h3>Available now <span class="ct">${ready.length}</span></h3>`;
   h += ready.length ? `<div class="plist">${ready.map(c => planItem(c.code, P)).join("")}</div>` : `<p class="plain muted">${vis.length && doneShown === vis.length ? "Every shown course is completed." : "Nothing shown is available yet."}</p>`;
-  h += `</div><footer><button class="btn" type="button" id="pClearGoals"${plan.goals.length ? "" : " disabled"}>Clear goals</button><button class="btn danger" type="button" id="pClearDone"${plan.completed.size ? "" : " disabled"}>Clear completed</button></footer>`;
+  h += `</div><footer><button class="btn sd-btn sd-small" type="button" id="pClearGoals"${plan.goals.length ? "" : " disabled"}>Clear goals</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="pClearDone"${plan.completed.size ? "" : " disabled"}>Clear completed</button></footer>`;
   return h;
 }
 // the plan block at the top of a pinned course's details
@@ -1099,9 +1099,9 @@ function planDetailsHtml(c) {
   const P = planInfo(), st = P.status.get(c.code);
   const goal = plan.goals.includes(c.code);
   let h = `<h3>Plan</h3><p class="pstat ${st.state}">${esc(statusText(c.code))}</p>
-    <div class="hlrow"><button type="button" class="btn${st.state === "done" ? " on" : ""}" id="dDone" aria-pressed="${st.state === "done"}">${st.state === "done" ? "✓ Completed" : "Mark completed"}</button>
-    <button type="button" class="btn${goal ? " on" : ""}" id="dGoal" aria-pressed="${goal}">${goal ? "◎ Goal" : "Set as goal"}</button></div>`;
-  if (st.years && st.years.left.length) h += `<p class="plain muted" style="margin-top:8px">Still to complete (${esc(progName(st.years.program))}):</p><div class="grp" style="margin-top:6px">${st.years.left.map(x => chip(x, "n")).join("")}</div>`;
+    <div class="hlrow"><button type="button" class="btn sd-btn sd-small${st.state === "done" ? " on" : ""}" id="dDone" aria-pressed="${st.state === "done"}">${st.state === "done" ? "✓ Completed" : "Mark completed"}</button>
+    <button type="button" class="btn sd-btn sd-small${goal ? " on" : ""}" id="dGoal" aria-pressed="${goal}">${goal ? "◎ Goal" : "Set as goal"}</button></div>`;
+  if (st.years && st.years.left.length) h += `<p class="plain muted mt">Still to complete (${esc(progName(st.years.program))}):</p><div class="grp mt">${st.years.left.map(x => chip(x, "n")).join("")}</div>`;
   return h;
 }
 
@@ -1140,23 +1140,23 @@ function renderDetails() {
   const shownCap = view ? view.visible.filter(o => lim(o) && o.code !== c.code && !lim(c) && c.semester <= lim(o) && view.nodes.has(c.code)) : [];
   const unlocks = [...new Set([...[...state.courses.values()].filter(o => [...o.prereqs, ...o.coreqs].some(g => g.includes(c.code))).map(o => o.code), ...shownCap.map(o => o.code)])].sort(cmpCode);
   const hl = state.highlights.find(h => h.code === c.code);
-  let html = `<header><span class="dcode">${esc(c.code)}</span><span class="hbtns">${plan.on ? `<button class="btn ghost" type="button" id="dBack" title="Back to the plan panel">← plan</button>` : ""}<button class="xbtn" type="button" id="dClose" aria-label="Close details">×</button></span>
+  let html = `<header><span class="dcode">${esc(c.code)}</span><span class="hbtns">${plan.on ? `<button class="btn ghost sd-btn sd-small sd-ghost" type="button" id="dBack" title="Back to the plan panel">← plan</button>` : ""}<button class="xbtn sd-x" type="button" id="dClose" aria-label="Close details">×</button></span>
     <div class="dname">${esc(c.name)}</div><div class="dsem">${semLabel(c.semester)} · ${semLong(c.semester)}</div></header><div class="dbody">`;
   if (plan.on) html += planDetailsHtml(c);
-  html += `<h3>Highlight tree</h3><div class="hlrow"><div class="seg" role="group" aria-label="Highlight tree">${Object.entries(DIRS).map(([k, v]) =>
-    `<button type="button" data-hl="${k}" aria-pressed="${!!hl && hl.dir === k}">${v}</button>`).join("")}</div><button type="button" class="btn" id="dZoom" style="height:28px">Zoom to chain</button></div>`;
+  html += `<h3>Highlight tree</h3><div class="hlrow"><div class="seg sd-seg" role="group" aria-label="Highlight tree">${Object.entries(DIRS).map(([k, v]) =>
+    `<button type="button" data-hl="${k}" aria-pressed="${!!hl && hl.dir === k}">${v}</button>`).join("")}</div><button type="button" class="btn sd-btn sd-small" id="dZoom">Zoom to chain</button></div>`;
   const yrs = PFPlan.rules(c).yearsComplete;
   const capPre = yrs && view && view.nodes.has(c.code) ? view.preds.get(c.code).filter(x => !c.prereqs.some(g => g.includes(x))).length : 0;
   html += `<h3>Prerequisites <span class="ct">${c.prereqs.length + (yrs ? 1 : 0)}</span></h3>` + (c.prereqs.length ? `<div class="groups">${groupsHtml(c.prereqs, "n")}</div>` : yrs ? "" : `<p class="plain muted">None listed.</p>`);
-  if (yrs) html += `<p class="plain"${c.prereqs.length ? ' style="margin-top:6px"' : ""}>Every program course in years 1–${yrs}${capPre ? `: ${plural(capPre, "course")} shown, linked along the bottom of the sheet` : ""}.</p>`;
+  if (yrs) html += `<p class="plain${c.prereqs.length ? " mt" : ""}">Every program course in years 1–${yrs}${capPre ? `: ${plural(capPre, "course")} shown, linked along the bottom of the sheet` : ""}.</p>`;
   const cr = PFPlan.rules(c).minCredits;
-  if (cr) html += `<p class="plain" style="margin-top:6px">At least ${cr} credit hours completed (${Math.ceil(cr / PFPlan.CREDITS)} courses at 3 credit hours each). Not drawn as links.</p>`;
-  if (c.coreqs.length) html += `<h3>Corequisites <span class="ct">${c.coreqs.length}</span></h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted" style="margin-top:6px">Taken before or alongside; drawn like prerequisites.</p>`;
+  if (cr) html += `<p class="plain mt">At least ${cr} credit hours completed (${Math.ceil(cr / PFPlan.CREDITS)} courses at 3 credit hours each). Not drawn as links.</p>`;
+  if (c.coreqs.length) html += `<h3>Corequisites <span class="ct">${c.coreqs.length}</span></h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted mt">Taken before or alongside; drawn like prerequisites.</p>`;
   html += `<h3>Required by <span class="ct">${unlocks.length}</span></h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
   if (c.notes.length) html += `<h3>Notes</h3>${c.notes.map(n => `<p class="plain">${esc(n)}</p>`).join("")}`;
   if (c.ignored.length) html += `<h3>Ignored from the source</h3>${c.ignored.map(n => `<p class="plain muted">${esc(n)}</p>`).join("")}`;
   if (c.programs.length) html += `<h3>Listed in <span class="ct">${c.programs.length}</span></h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}</li>`).join("")}</ul>`;
-  html += `</div><footer><button class="btn" type="button" id="dEdit">Edit</button><button class="btn danger" type="button" id="dDelete">Delete</button></footer>`;
+  html += `</div><footer><button class="btn sd-btn sd-small" type="button" id="dEdit">Edit</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="dDelete">Delete</button></footer>`;
   d.innerHTML = html;
   d.hidden = false;
   if (!wasOpen) sizeWorld();
@@ -1197,8 +1197,8 @@ function syncControls() {
   const has = state.courses.size > 0;
   const nEdges = [...state.courses.values()].reduce((n, c) => n + [...c.prereqs, ...c.coreqs].reduce((k, g) => k + g.filter(x => state.courses.has(x)).length, 0), 0);
   $("#sheetInfo").textContent = has
-    ? `${plural(state.courses.size, "course")} · ${plural(state.programs.length, "program")} · ${plural(nEdges, "link")}`.toUpperCase()
-    : "NO COURSES LOADED";
+    ? `${plural(state.courses.size, "course")} · ${plural(state.programs.length, "program")} · ${plural(nEdges, "link")}`
+    : "No courses loaded";
   $("#searchWrap").hidden = !has;
   $("#legendProg").hidden = state.programs.length < 2;
   $("#btnExport").disabled = !has;
@@ -1229,8 +1229,8 @@ function syncPlanbar(has = state.courses.size > 0) {
   $$("#planSeg button").forEach(b => b.setAttribute("aria-checked", String((b.dataset.plan === "1") === plan.on)));
   $("#planbar").hidden = !on;
   $("#hint").textContent = plan.on
-    ? "plan mode · click courses to mark them completed · ◎ goal: click a course to plan a route to it · pin: inspect a course · hover to trace"
-    : "scroll to zoom · drag to pan · hover to trace · click to pin · shift+click to highlight a tree · shift+drag to zoom into an area · double-click to edit";
+    ? "Plan mode. Choose what clicking a course does: mark it completed, set it as a goal to see the route to it, or show its details."
+    : "Explore mode. Hover a course to trace it, click to pin it, and scroll or pinch to zoom.";
   if (!on) return;
   $$("#brushSeg button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.brush === plan.brush)));
   const P = planInfo();
@@ -1304,7 +1304,7 @@ function openWelcome() {
   $("#wDate").textContent = today();
   $("#empty").hidden = true;
   openDialog("#welcomeDlg");
-  setTimeout(() => $("#wDefault").focus(), 0);
+  setTimeout(() => $(saved ? "#wResumeBtn" : "#wDefault").focus(), 0); // a returning visitor's Enter resumes, never overwrites
 }
 function loadDefault(program) {
   if (!DEFAULT) return;
@@ -1351,9 +1351,9 @@ function rowClass(r) { return "prow" + (r.parsed ? " ok" : r.kind === "empty" ? 
 function renderRows() {
   if (!rows.length) rows.push(newRow());
   $("#prows").innerHTML = rows.map(r => `<div class="${rowClass(r)}" data-id="${r.id}">
-      <input class="psem" type="number" min="1" max="16" inputmode="numeric" aria-label="Semester number" value="${r.sem || ""}" placeholder="${rowSem(r) || ""}" id="sem-${r.id}">
-      <div class="pmain"><input class="ptext" type="text" value="${esc(r.text)}" placeholder="ELEE 3180U Design Principles &amp; Project Management (ELEE 2250U, ELEE 2450U)" aria-label="Course line" id="txt-${r.id}" spellcheck="false" autocomplete="off"><div class="pinfo">${rowInfo(r)}</div></div>
-      <button class="prm" type="button" aria-label="Remove row">×</button></div>`).join("");
+      <input class="psem sd-input sd-small sd-mono" type="number" min="1" max="16" inputmode="numeric" aria-label="Semester number" value="${r.sem || ""}" placeholder="${rowSem(r) || ""}" id="sem-${r.id}">
+      <div class="pmain"><input class="ptext sd-input sd-small sd-mono" type="text" value="${esc(r.text)}" placeholder="ELEE 3180U Design Principles &amp; Project Management (ELEE 2250U, ELEE 2450U)" aria-label="Course line" id="txt-${r.id}" spellcheck="false" autocomplete="off"><div class="pinfo">${rowInfo(r)}</div></div>
+      <button class="prm sd-btn sd-small sd-icon sd-ghost" type="button" aria-label="Remove row">×</button></div>`).join("");
   updatePasteFooter();
 }
 function refreshRow(r) {
@@ -1661,7 +1661,7 @@ function openImageDlg() {
   const prev = ($("input[name=imgScope]:checked") || {}).value;
   const want = plan.on && scopes.find(s => s.id === "path").ok ? "path" : state.highlights.length ? "trees" : "view";
   const pick = (scopes.find(s => s.id === prev && s.ok) || scopes.find(s => s.id === want && s.ok) || scopes[0]).id;
-  $("#imgScope").innerHTML = scopes.map(s => `<label class="choice"><input type="radio" name="imgScope" value="${s.id}"${s.ok ? "" : " disabled"}${s.id === pick ? " checked" : ""}><span>${esc(s.label)}</span></label>`).join("");
+  $("#imgScope").innerHTML = scopes.map(s => `<label class="choice sd-check"><input type="radio" name="imgScope" value="${s.id}"${s.ok ? "" : " disabled"}${s.id === pick ? " checked" : ""}><span>${esc(s.label)}</span></label>`).join("");
   $("#imgHl").disabled = !state.highlights.length;
   const hasPlan = plan.completed.size > 0 || plan.goals.length > 0;
   $("#imgPlan").disabled = !hasPlan;

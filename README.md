@@ -46,18 +46,18 @@ embedding the font into SVG exports, because browsers block `fetch()` on `file:/
 
 ### Start screen
 
-Each visit opens on a start screen with two choices:
+Each visit opens on a start screen. If a previous session is saved in the browser,
+**Resume last session** comes first, and it's the button that has focus, so pressing
+Enter picks up where you left off. Below it are two ways in:
 
-- **[A] Ontario Tech Engineering**: load the 16 built-in program maps. You can
-  start with all of them or pick a single program.
-- **[B] Your own courses**: open **Line input**, or load a `.json` / `.csv` / `.txt`
+- **Ontario Tech Engineering**: load the 16 built-in program maps. You can start with
+  all of them or pick a single program.
+- **Your own courses**: open **Line input**, or load a `.json` / `.csv` / `.txt`
   (for example one you exported from PrereqFlow earlier).
 
 Every Ontario Tech engineering program map is built in, so PDFs aren't imported.
-For other course lists, paste the text into Line input.
-
-If a previous session is saved in the browser, a **Resume last session** button
-appears as well.
+For other course lists, paste the text into Line input; its **Line format** section
+lists the syntax below.
 
 ### Line input format
 
@@ -105,6 +105,9 @@ out of a PDF. Each course ends up on its own row and is checked as you type.
 | `/` | search by code or name |
 | `p` | switch between Explore and Plan |
 
+**Controls**, at the right end of the bar under the toolbar (in the ☰ menu on a phone),
+lists every gesture, key and colour in one place.
+
 Three requirements aren't plain course lists, and are shown on the card as a small tag:
 
 - **Capstone Systems Design I** (`Y1–3`) needs every program course in years 1–3.
@@ -119,16 +122,17 @@ Three requirements aren't plain course lists, and are shown on the card as a sma
 
 ### Plan mode
 
-**Explore / Plan** in the toolbar switches between analysing the program maps and
-planning. Turning plan mode off only hides the plan; nothing is cleared.
+**Explore / Plan**, next to the name in the toolbar, switches between analysing the
+program maps and planning. Turning plan mode off only hides the plan; nothing is
+cleared. In plan mode, **Click a course to** sets what a click on the chart does:
 
-- **✓ completed** (the default): click a course to mark it completed, and again to
+- **Mark completed** (the default): click a course to mark it completed, and again to
   unmark it. Courses you can take now get a blue ring and an **available** tag;
   locked courses fade back. A course is available when every prerequisite group has a
   completed course (one is enough for either/or), each corequisite is completed or
   available, the credit threshold is met (completed courses × 3) and, for Capstone,
   every year 1–3 course is done.
-- **◎ goal**: click a course to make it a goal. The courses still needed for all goals
+- **Set a goal**: click a course to make it a goal (◎). The courses still needed for all goals
   are marked **step 1, step 2, …** and their links light up. Step 1 is what you can take
   now; each later step only needs earlier ones (corequisites can share a step). For an
   either/or requirement a completed option counts; otherwise an option in the program
@@ -136,7 +140,7 @@ planning. Turning plan mode off only hides the plan; nothing is cleared.
   the course that needs it), then one the path already takes, then the one with the
   fewest courses left. The plan panel lists every either/or pick it made. A course
   with a credit threshold moves back until enough courses come before it.
-- **pin**: click to open a course's details, which also have **Mark completed** and
+- **Show details**: click to open a course's details, which also have **Mark completed** and
   **Set as goal** buttons.
 
 The **plan panel** lists your goals, the path to them step by step, and every course
@@ -144,7 +148,7 @@ available now. Completions count everywhere: a course marked in Mechanical is al
 completed in Electrical and the all-programs view. For Capstone, the program shown
 decides which year 1–3 courses count; in the all-programs view it's the program with
 the fewest left. The plan is saved in the browser, separately from the sheet, so it
-survives reloads, **Start over** and program switches, and a JSON export carries it
+survives reloads, the **Start screen** and program switches, and a JSON export carries it
 too.
 
 ### Zoom and navigation
@@ -153,7 +157,7 @@ too.
 - **drag**: pan (a sideways trackpad swipe or **shift + scroll** also pans)
 - **pinch** (trackpad or touch screen): zoom
 - **shift + drag**: draw a box and zoom into that part of the chart
-- `+` / `-` / `0` (fit) / `1` (100%), or the zoom bar at the bottom right
+- `+` / `-` / `0` (fit) / `1` (100%), or the zoom control at the bottom right
 - **Zoom to chain** (detail panel) and **Zoom to trees** (highlight bar) frame
   just the courses involved
 
@@ -170,9 +174,10 @@ The sheet is never still:
 - Cards fade in when a sheet loads and glide to their new places when you switch
   layouts or programs.
 
-The **motion** button in the zoom bar turns all of this off (it's the same switch as
-**Animations** in the settings menu, so it applies to all three sites). If your system
-asks for reduced motion, cards still float, at half the distance.
+The **Motion** button in the zoom control turns all of this off (it's the same switch as
+**Animations** in the settings menu, so it applies to every site). If your system asks
+for reduced motion, the sheet holds still: no float, sheen or particles, and zooming
+jumps instead of gliding.
 
 ### Themes and settings
 
@@ -223,8 +228,10 @@ browser.
 
 ```
 index.html                    page shell: toolbar, chart stage, dialogs
-css/style.css                 soft drafting-sheet theme (night + paper fallback), motion
+css/fallback.css              offline copy of the shared design system (generated, npm run sync:design)
+css/style.css                 the page's layout, the chart's colour roles and figure sizes, motion
 js/theme.js                   offline fallback: remembered light/dark sheet and motion
+js/chrome.js                  the phone menu sheet and focus kept inside dialogs (no app state)
 js/parser.js        PF        course text / PDF table → course records
 js/layout.js        PFLayout  course records → card positions + routed links
 js/plan.js          PFPlan    completed + goal courses → availability and goal path
@@ -232,9 +239,11 @@ js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
 js/app.js                     state, import, rendering, zoom, highlights, plan, export
 data/*.json                   built-in Ontario Tech data (PrereqFlow export format)
 data/*.js                     the same data wrapped for <script> loading (generated)
-assets/fonts/                 mononoki (SIL Open Font License)
+assets/fonts/                 mononoki and Libre Franklin (SIL Open Font License)
+scripts/sync-design.js        copies the shared design system into css/fallback.css
 scripts/build-data.js         regenerates data/*.js from data/*.json
-tests/                        node:test suites for the parser, layout and planner
+tests/                        node:test suites for the parser, layout and planner, and a
+                              browser check that drives every feature (browser-check.js)
 ```
 
 ### Parsing (`js/parser.js`)
@@ -286,18 +295,27 @@ programs, the combined view, and data containing corequisites and cycles.
 
 The default sheets, night (dark) and paper (light), use warm neutrals instead of pure
 black and white, one periwinkle/apricot pair for tracing needs/unlocks, and six pastel
-hues for tree highlights. All text is set in mononoki.
+hues for tree highlights. The interface is set in Libre Franklin, like the portfolio;
+course codes, the chart's cards, the wordmark and exported images use mononoki.
 
-The colours and themes come from the master palette shared with
-[areeb-ece.github.io](https://areeb-ece.github.io/) and OTU Calendar:
-`/design/tokens.css`, kept in the portfolio repo under `public/design/` along with the
-settings panel and night sky (`ui.js`, `ui.css`) and the script that applies saved
-settings before the page paints (`theme.js`). The page loads them after `css/style.css`,
-so changing them there restyles all three sites. For themes other than night and paper,
-the chart's own colours (links, needs/unlocks) are derived from the theme's in
-`css/style.css`. Offline or from disk, those files can't load: the page falls back to
-the night/paper values in `css/style.css` and a light/dark button. Image export reads
-the current theme, or the master palette's night or paper sheet.
+Everything else comes from the shared design system of
+[areeb-ece.github.io](https://areeb-ece.github.io/), OTU Calendar and Satisfactory Tools,
+kept in the portfolio repo under `public/design/` and served at `/design/`: the themes
+and the type, spacing, control, motion and layer scales (`tokens.css`), the `sd-`
+components the page's buttons, fields, segmented controls, tabs, tables and dialogs use,
+the settings panel and the night sky (`ui.css`, `ui.js`), the script that applies saved
+settings before the page paints (`theme.js`) and the text face (`fonts.css`). Changing
+them there restyles every site. `css/style.css` uses only those tokens; what it adds is
+the chart's own colour roles (needs, unlocks, goal, links), mixed from each theme's
+colours so every theme gets them, and the chart cards' figure sizes, which match the
+image export.
+
+The page loads `css/fallback.css` first, a copy of the night and paper themes, the
+scales and the components, so the live `/design/` files override it whenever they load.
+Offline, from disk or against an older `/design/`, the copy keeps the page whole and a
+light/dark button replaces the settings panel. `npm run sync:design` refreshes the copy
+from `../areeb-ece.github.io/public/design`; `npm run check:design` says when it has
+drifted. Image export reads the current theme, or the night or paper sheet.
 
 ### Ambient motion
 
@@ -337,7 +355,17 @@ sites on areeb-ece.github.io). Nothing is uploaded anywhere.
 npm test               # parser, layout + planner tests (node:test, no dependencies)
 npm run build:data     # regenerate data/*.js after editing data/*.json
 npm run check:data     # verify data/*.js matches data/*.json (run in CI)
+npm run sync:design    # copy the shared design system into css/fallback.css
+npm run check:design   # say whether css/fallback.css still matches it
+npm run test:browser   # drive every feature in Chromium at desktop and phone width
 ```
+
+The browser check needs Playwright (`npm i --no-save playwright@1.56.1`, then
+`npx playwright install chromium`). It serves the page at `/prereqflow/` and, by
+default, no `/design/`, so it tests the offline fallback;
+`DESIGN_DIR=../areeb-ece.github.io/public/design npm run test:browser` tests it with the
+shared design system, and `BROWSER=firefox` runs it in Firefox. Screenshots go to
+`test-results/screenshots/`.
 
 To update the built-in programs: set `PDF_IMPORT = true` in `js/app.js` (the PDF
 reader is kept but switched off), load the new program-map PDFs in the app, export
@@ -348,8 +376,10 @@ if the maps still leave them out, and switch `PDF_IMPORT` off again.
 ## Credits
 
 - Made by **areeb**: [areeb-ece.github.io/prereqflow](https://areeb-ece.github.io/prereqflow/).
-- Typeface: [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
-  SIL Open Font License 1.1 (`assets/fonts/OFL-mononoki.txt`).
+- Typefaces: [mononoki](https://github.com/madmalik/mononoki) by Matthias Tellen,
+  SIL Open Font License 1.1 (`assets/fonts/OFL-mononoki.txt`), and
+  [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by the Libre Franklin Project Authors,
+  SIL Open Font License 1.1 (`assets/fonts/OFL-LibreFranklin.txt`).
 - PDF reading (switched off; used to build the data): [pdf.js](https://mozilla.github.io/pdf.js/),
   loaded from a CDN only when a PDF is imported.
 - Course data: Ontario Tech University program maps, 2026–2027. Always check the

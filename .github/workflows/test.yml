@@ -1,4 +1,7 @@
 name: test
+# Unit tests and the data check, then the browser check twice: once offline (the page's
+# own copy of the design system, css/fallback.css) and once with the shared design
+# system exactly as the live portfolio serves it.
 on:
   push:
   pull_request:
@@ -12,3 +15,31 @@ jobs:
           node-version: 22
       - run: npm run check:data
       - run: npm test
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm i --no-save playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      # The shared files exactly as the live site serves them to this page.
+      - run: |
+          mkdir -p "$RUNNER_TEMP/site/design" "$RUNNER_TEMP/site/fonts"
+          for f in tokens.css ui.css theme.js ui.js; do
+            curl -fsSL "https://areeb-ece.github.io/design/$f" -o "$RUNNER_TEMP/site/design/$f"
+          done
+          # the text face is newer than the rest; until the portfolio serves it, the page uses its own copy
+          curl -fsSL "https://areeb-ece.github.io/design/fonts.css" -o "$RUNNER_TEMP/site/design/fonts.css" || echo "no /design/fonts.css yet"
+          curl -fsSL "https://areeb-ece.github.io/fonts/LibreFranklin-Var.woff2" -o "$RUNNER_TEMP/site/fonts/LibreFranklin-Var.woff2" || true
+      - run: npm run test:browser
+        env:
+          DESIGN_DIR: ${{ runner.temp }}/site/design
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: test-results/screenshots/
+          if-no-files-found: ignore
