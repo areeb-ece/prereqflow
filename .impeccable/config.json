@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-21T01:10:51.518Z",
+        "reason": "Claude (session 2026-10-20): static scan can't resolve /design/ui.css; the flagged .seg and .tabs are the master's sd-seg (2px inset, buttons sized from --ctl-h) and sd-tabs (underline tabs), verified in the browser screenshots"
+      },
+      {
+        "rule": "marquee",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-21T01:10:51.525Z",
+        "reason": "Claude (session 2026-10-20): the flagged loop is the card sheen, PrereqFlow's documented ambient motion (README Motion section), off with the Animations/Motion switch and under prefers-reduced-motion; no content scrolls"
+      }
+    ]
+  }
+}
