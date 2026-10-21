@@ -152,14 +152,6 @@ a { color: var(--accent); text-decoration: none; }
 
 /* ── the stage ────────────────────────────────────── */
 .stage { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--sheet-2); overflow: hidden; isolation: isolate; }
-/* offline there is no shared sky; this is its haze, from the same theme colours */
-.stage::before { /* the master sky's haze, for offline */
-  content: ""; position: absolute; inset: -20%; z-index: -1; pointer-events: none;
-  background: radial-gradient(40% 45% at 30% 35%, var(--glow-a), transparent 70%), radial-gradient(35% 40% at 72% 68%, var(--glow-b), transparent 70%); /* taste-skill-ignore */
-  animation: aurora 38s ease-in-out infinite alternate;
-}
-@keyframes aurora { 0% { transform: translate(-4%, -3%) scale(1); } 50% { transform: translate(5%, 2%) scale(1.08); } 100% { transform: translate(-2%, 5%) scale(1.02); } }
-.has-sky .stage::before { display: none; }
 .colhead { position: relative; flex: none; height: var(--sp-7); background: var(--sheet); border-bottom: 1px solid var(--rule-2); overflow: hidden; }
 .colhead .band { position: absolute; top: 0; height: var(--sp-5); display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule-2); font: var(--fw-ui) var(--fs-1) var(--font-text); color: var(--ink-2); white-space: nowrap; overflow: hidden; }
 .colhead .ch { position: absolute; top: var(--sp-5); height: var(--sp-5); display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; overflow: hidden; }
@@ -205,22 +197,14 @@ svg.edges.settling { opacity: 0; transition: none; }
 .cards { position: absolute; inset: 0; }
 .card {
   position: absolute; padding: 7px 10px 6px; display: flex; flex-direction: column; gap: 2px; text-align: left; color: var(--ink);
-  border: 1px solid var(--rule); border-radius: var(--r); background: var(--card); box-shadow: var(--shadow-card);
+  border: 1px solid var(--rule); border-radius: var(--r); background: var(--card);
   cursor: pointer; overflow: hidden; will-change: transform; -webkit-tap-highlight-color: transparent;
   transition: background-color var(--dur-2), border-color var(--dur-2), opacity var(--dur-3) var(--ease-out), box-shadow var(--dur-2);
 }
 .card:focus-visible { outline-offset: 3px; }
-/* the float itself is driven from app.js (cards and link ends move together); CSS adds the
-   entrance and an occasional sheen across each card near the screen */
+/* the float itself is driven from app.js (cards and link ends move together); CSS adds the entrance */
 .card.rise { animation: rise .55s var(--ease-out) var(--in, 0s) both; }
 @keyframes rise { from { opacity: 0; scale: .96; translate: 0 10px; } }
-.card::before { /* the sheen, part of the sheet's ambient motion */
-  content: ""; position: absolute; inset: -1px; pointer-events: none; border-radius: inherit;
-  background: linear-gradient(105deg, transparent 35%, var(--sheen) 50%, transparent 65%); /* taste-skill-ignore */
-  transform: translateX(-110%);
-}
-.card.fl::before { animation: sheen var(--sd, 12s) ease-in-out var(--sdl, 0s) infinite; }
-@keyframes sheen { 0%, 86% { transform: translateX(-110%); } 100% { transform: translateX(110%); } }
 @media (hover: hover) { .card:hover { background: var(--card-hover); border-color: var(--ink-4); } }
 .card .code { display: flex; align-items: center; gap: 6px; font: var(--fw-head) var(--fig-code)/1.2 var(--font-mono); letter-spacing: .01em; color: var(--ink); }
 .card .code i { margin-left: auto; font: var(--fw-text) var(--fig-tag) var(--font-mono); font-style: normal; color: var(--ink-2); }
@@ -240,23 +224,23 @@ svg.edges.settling { opacity: 0; transition: none; }
 .card.p-off { opacity: .38; }
 .card.p-done { background: color-mix(in srgb, var(--ok) 9%, var(--card)); border-color: color-mix(in srgb, var(--ok) 45%, var(--rule)); }
 .card.p-done .name { color: var(--ink-3); }
-.card.p-ready { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent), var(--shadow-card); }
+.card.p-ready { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent); }
 .card.p-path { border-color: var(--goal); border-style: dashed; opacity: 1; }
-.card.p-goal { border-color: var(--goal); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal) 38%, transparent), var(--shadow-card); }
+.card.p-goal { border-color: var(--goal); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal) 38%, transparent); }
 .card.is-dim { opacity: .25; }
-.card.is-match { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink), var(--shadow-card); } /* not the accent: in Plan that ring means available now */
+.card.is-match { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); } /* not the accent: in Plan that ring means available now */
 .card.is-needs { border-color: var(--needs); background: var(--needs-soft); }
 .card.is-needs .code { color: var(--needs-ink); }
 .card.is-unlocks { border-color: var(--unlocks); background: var(--unlocks-soft); }
 .card.is-unlocks .code { color: var(--unlocks-ink); }
-.card.is-focus { border-color: var(--focus-bg); background: var(--focus-bg); box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-bg) 25%, transparent), var(--shadow-card); }
+.card.is-focus { border-color: var(--focus-bg); background: var(--focus-bg); box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-bg) 25%, transparent); }
 .card.is-focus .code, .card.is-focus .name, .card.is-focus .code i { color: var(--focus-ink); }
 .card.is-hl { border-color: var(--hc); background: color-mix(in srgb, var(--hc) 10%, var(--card)); }
 .card.is-hl .code { color: color-mix(in srgb, var(--hc) 60%, var(--ink)); }
-.card.is-root { box-shadow: 0 0 0 3px color-mix(in srgb, var(--hc) 32%, transparent), var(--shadow-card); }
+.card.is-root { box-shadow: 0 0 0 3px color-mix(in srgb, var(--hc) 32%, transparent); }
 .card.is-selected::after { content: ""; position: absolute; inset: 3px; border: 1.5px dashed var(--ink-3); border-radius: calc(var(--r) - 3px); pointer-events: none; }
 .card.is-focus.is-selected::after { border-color: var(--focus-ink); }
-:root[data-motion="off"] .card, :root[data-motion="off"] .card::before, :root[data-motion="off"] .stage::before, :root[data-motion="off"] .flow { animation: none !important; }
+:root[data-motion="off"] .card, :root[data-motion="off"] .flow { animation: none !important; }
 
 .marquee { position: absolute; z-index: var(--z-sticky); border: 1.5px dashed var(--accent); border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 8%, transparent); pointer-events: none; }
 
@@ -351,7 +335,7 @@ button.chip:active { transform: scale(.96); }
 /* ── dialogs: the shared dialog's look on the page's own overlay ── */
 .overlay { position: fixed; inset: 0; z-index: var(--z-float); display: grid; place-items: center; padding: var(--sp-4); background: var(--scrim); animation: fade var(--dur-2) var(--ease-out); }
 @keyframes fade { from { opacity: 0; } }
-.dialog { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--rule); overflow: hidden; animation: dialog-in var(--dur-2) var(--ease-out); }
+.dialog { display: flex; flex-direction: column; min-width: 0; overflow: hidden; animation: dialog-in var(--dur-2) var(--ease-out); }
 .dialog.wide { width: min(52rem, calc(100vw - 2 * var(--sp-4))); }
 @keyframes dialog-in { from { opacity: 0; transform: scale(.96); } }
 .dialog .dbody { flex: 1; min-height: 0; overflow: auto; padding: var(--sp-1) var(--sp-5) var(--sp-4); }
@@ -370,12 +354,9 @@ details.format .sd-table { margin-top: var(--sp-2); }
 
 /* the start screen: a title block closed by the heavy bar, then the two ways in */
 .welcome { width: min(54rem, calc(100vw - 2 * var(--sp-4))); }
-.sd-dialog > header.tblock { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: var(--sp-5); padding: var(--sp-6) var(--sp-6) var(--sp-5); border-bottom: 2px solid var(--ink); }
+.sd-dialog > header.tblock { display: block; padding: var(--sp-6) var(--sp-6) var(--sp-5); border-bottom: 2px solid var(--ink); }
 .sd-dialog > header.tblock h2 { margin: 0; font: var(--fw-head) var(--fs-6)/1 var(--font-mono); letter-spacing: var(--tr-mark); }
 .tblock p { max-width: var(--measure-text); margin: var(--sp-3) 0 0; font-size: var(--fs-3); color: var(--ink-2); }
-.tmeta { display: grid; gap: 2px; margin: 0; text-align: right; }
-.tmeta dt { font-size: var(--fs-1); color: var(--ink-2); }
-.tmeta dd { margin: 0; font: var(--fs-2) var(--font-mono); color: var(--ink); }
 .resume { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-3) var(--sp-5); padding: var(--sp-4) var(--sp-6); background: var(--tint); }
 .resume b { display: block; font: var(--fw-strong) var(--fs-3)/1.3 var(--font-text); }
 .resume span { display: block; color: var(--ink-2); font-variant-numeric: tabular-nums; }
@@ -389,7 +370,7 @@ details.format .sd-table { margin-top: var(--sp-2); }
 /* with a saved session, Resume is the way in and the built-in maps step back */
 .welcome:has(#wResume:not([hidden])) #wDefault { border-color: var(--rule); background: var(--card); color: var(--ink); font-weight: var(--fw-ui); }
 @media (hover: hover) { .welcome:has(#wResume:not([hidden])) #wDefault:hover { border-color: var(--ink-4); background: var(--card-hover); } }
-.wfoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-6); border-top: 1px solid var(--rule-2); background: var(--sheet-2); font-size: var(--fs-1); color: var(--ink-2); }
+.wfoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-6); border-top: 1px solid var(--rule-2); font-size: var(--fs-1); color: var(--ink-2); }
 .wfoot b { color: var(--ink); }
 .wfoot .by { flex: 1 1 20rem; }
 
@@ -530,8 +511,7 @@ textarea.dump { min-height: 16rem; font-size: var(--fs-1); }
 @media (max-width: 600px) {
   .overlay { padding: var(--sp-2); align-items: end; }
   .dialog, .dialog.wide, .welcome { width: 100%; max-height: calc(100dvh - var(--sp-4)); }
-  .sd-dialog > header.tblock { grid-template-columns: 1fr; padding: var(--sp-5) var(--sp-4) var(--sp-4); }
-  .tmeta { text-align: left; grid-auto-flow: column; justify-content: start; gap: var(--sp-2); }
+  .sd-dialog > header.tblock { padding: var(--sp-5) var(--sp-4) var(--sp-4); }
   .resume, .opt, .wfoot { padding-left: var(--sp-4); padding-right: var(--sp-4); }
   .dialog .dbody { padding: var(--sp-1) var(--sp-4) var(--sp-4); }
   .dialog > footer { padding: var(--sp-3) var(--sp-4) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px)); }
