@@ -11,7 +11,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const cmpCode = (a, b) => a.localeCompare(b, "en", { numeric: true });
 const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
-const semLabel = s => PF.semesterLabel(s);
+const semLabel = s => { const y = Math.ceil(s / 2), t = s - (y - 1) * 2; return `Year ${y} Sem ${t}`; };
 const semLong = s => { const y = Math.ceil(s / 2), t = s - (y - 1) * 2; return `Year ${y} · Semester ${t}`; };
 const clampSem = s => Math.max(1, Math.min(16, Math.round(+s) || 1));
 const shortProg = p => String(p).replace(/\s+(?:19|20)\d{2}\s*[-–]\s*(?:19|20)?\d{2}$/, "");
@@ -384,7 +384,7 @@ function showReport(reports, result, title) {
   const notes = ok.flatMap(r => r.notes);
   if (notes.length) html += `<div class="rsec"><h3>Requirements kept as notes (no course code)</h3><ul>${[...new Set(notes)].slice(0, 30).map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>`;
   const guessed = ok.reduce((n, r) => n + r.guessed, 0);
-  if (guessed) html += `<div class="rsec"><h3>No semester given</h3><ul><li>${plural(guessed, "course")} placed by course level (1000-level → 1-1, 2000-level → 2-1, …). Double-click a course to move it, or switch to Free flow, which ignores semesters.</li></ul></div>`;
+  if (guessed) html += `<div class="rsec"><h3>No semester given</h3><ul><li>${plural(guessed, "course")} placed by course level (1000-level → Year 1, 2000-level → Year 2, …). Double-click a course to move it, or switch to Free flow, which ignores semesters.</li></ul></div>`;
   const other = [...new Set(ok.flatMap(r => r.other))];
   if (other.length) html += `<div class="rsec"><h3>Text that wasn't a course</h3><ul>${other.slice(0, 20).map(t => `<li>${esc(t)}</li>`).join("")}${other.length > 20 ? `<li class="muted">…and ${other.length - 20} more</li>` : ""}</ul></div>`;
   body.innerHTML = html;
@@ -466,9 +466,9 @@ function columnLabels(lay) {
   for (let k = 0; k < lay.nCols; k++) {
     if (lay.mode === "semester") {
       const y = Math.floor(k / 2) + 1, t = k % 2 + 1;
-      out.push({ main: `${y}-${t}`, sub: `sem ${t}`, n: lay.cols[k].length, band: `Year ${y}`, bandStart: k % 2 === 0 });
+      out.push({ main: `Sem ${t}`, band: `Year ${y}` });
     } else {
-      out.push({ main: `T${k + 1}`, sub: k === 0 ? "tier · entry" : "tier", n: lay.cols[k].length });
+      out.push({ main: `Tier ${k + 1}` });
     }
   }
   return out;
@@ -698,7 +698,7 @@ function renderColhead() {
   labels.forEach((l, k) => {
     const x = view.colX(k) * zoom - sl, w = D.colW * zoom;
     if (x + w < -20 || x > head.clientWidth + 20) return;
-    h += `<div class="ch${view.mode === "free" ? " solo" : ""}" style="left:${x}px;width:${w}px"><b>${l.main}</b>${compact ? "" : `<span class="t">${l.sub}</span><span class="n" title="Courses in this column">${l.n}</span>`}</div>`;
+    h += `<div class="ch${view.mode === "free" ? " solo" : ""}" style="left:${x}px;width:${w}px"><b>${l.main}</b></div>`;
   });
   head.innerHTML = h;
 }
@@ -914,7 +914,7 @@ function applyHighlight() {
     else if (!lifted && el.parentNode !== base) base.appendChild(el);
   }
   renderFlows(flows);
-  renderReadout(focus, anc, desc);
+  renderReadout(focus);
 }
 
 // small particles that travel along traced / highlighted links, towards the course they unlock
@@ -927,13 +927,11 @@ function renderFlows(flows) {
     `<path class="flow" data-i="${i}" d="${view.edges[i].d}" style="stroke:${color};animation-delay:-${(hashCode(String(i)) % 16) / 10}s"></path>`).join("");
 }
 
-function renderReadout(focus, anc, desc) {
+function renderReadout(focus) {
   const r = $("#readout");
   if (!focus || (focus === state.selected && !$("#details").hidden)) { r.hidden = true; return; }
   const c = state.courses.get(focus);
-  const direct = view.preds.get(focus).length, unl = view.succs.get(focus).length;
-  r.innerHTML = `<span class="c">${esc(c.code)}</span><span class="nm">${esc(c.name)}</span>
-    <span class="st"><span class="n">${anc.size - 1}</span> in prerequisite chain (${direct} direct) · <span class="u">${desc.size - 1}</span> unlocked (${unl} direct)</span>`
+  r.innerHTML = `<span class="c">${esc(c.code)}</span><span class="nm">${esc(c.name)}</span>`
     + (plan.on ? `<span class="ps ${planInfo().status.get(focus).state}">${esc(statusText(focus, true))}</span>` : "");
   r.hidden = false;
 }
@@ -983,6 +981,12 @@ function planInfo() {
   return planCache;
 }
 const progName = p => p ? shortProg(p) : "the loaded courses";
+// completed / available among exactly the courses a view shows
+function planCounts(codes, P) {
+  let done = 0, ready = 0;
+  for (const c of codes) { const st = P.status.get(c).state; if (st === "done") done++; else if (st === "ready") ready++; }
+  return { done, ready };
+}
 // one line on why a course is or isn't available
 function statusText(code, short = false) {
   const P = planInfo(), st = P.status.get(code);
@@ -1053,16 +1057,13 @@ function planPanelHtml() {
   const P = planInfo();
   const vis = view ? view.visible : [];
   const doneShown = vis.filter(c => plan.completed.has(c.code)).length;
-  const scope = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : `all ${plural(state.programs.length, "program")}`;
-  let h = `<header><span class="dcode">Plan</span><button class="xbtn sd-x" type="button" id="dClose" aria-label="Close the plan panel">×</button>
-    <div class="dname">${plural(P.count, "course")} completed · ${P.credits} credit hours</div>
-    <div class="dsem">${doneShown} of ${vis.length} shown completed · ${esc(scope)}</div></header><div class="dbody">`;
+  let h = `<header><span class="dcode">Plan</span><button class="xbtn sd-x" type="button" id="dClose" aria-label="Close the plan panel">×</button></header><div class="dbody">`;
   if (!plan.completed.size && !plan.goals.length) {
     h += `<p class="note sd-callout">Click a course to mark it completed; what you can take next lights up. Choose <b>Set a goal</b> and click a course to see, in order, what it takes to get there. Completed courses count in every program, and are kept between visits.</p>`;
   }
   // goals and the path to them
   const path = P.path;
-  h += `<h3>Goals <span class="ct">${plan.goals.length}</span></h3>`;
+  h += `<h3>Goals</h3>`;
   if (!plan.goals.length) h += `<p class="plain muted">No goals yet. Choose <b>Set a goal</b> next to “Click a course to”, then click a course (or use “Set as goal” on a pinned course).</p>`;
   else {
     h += `<div class="grp">${plan.goals.map(g => {
@@ -1073,7 +1074,7 @@ function planPanelHtml() {
       if (path.doneGoals.length) h += `<p class="plain muted mt">Already completed: ${esc(path.doneGoals.join(", "))}.</p>`;
       if (!path.needed.size) h += `<p class="plain mt">Nothing left to take for ${path.goals.length > 1 ? "these goals" : "this goal"}.</p>`;
       else {
-        h += `<h3>Path, in order <span class="ct">${plural(path.needed.size, "course")}</span></h3><div class="steps">`;
+        h += `<h3>Path, in order</h3><div class="steps">`;
         path.steps.forEach((list, i) => {
           const now = list.every(x => P.status.get(x).state === "ready");
           h += `<div class="step"><div class="sh"><b>Step ${i + 1}</b><span>${i === 0 ? (now ? "available now" : "start here") : `after step ${i}`}</span></div>${list.map(x => planItem(x, P)).join("")}</div>`;
@@ -1088,7 +1089,7 @@ function planPanelHtml() {
   }
   // available now, in this view
   const ready = vis.filter(c => P.status.get(c.code).state === "ready").sort((a, b) => a.semester - b.semester || cmpCode(a.code, b.code));
-  h += `<h3>Available now <span class="ct">${ready.length}</span></h3>`;
+  h += `<h3>Available now</h3>`;
   h += ready.length ? `<div class="plist">${ready.map(c => planItem(c.code, P)).join("")}</div>` : `<p class="plain muted">${vis.length && doneShown === vis.length ? "Every shown course is completed." : "Nothing shown is available yet."}</p>`;
   h += `</div><footer><button class="btn sd-btn sd-small" type="button" id="pClearGoals"${plan.goals.length ? "" : " disabled"}>Clear goals</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="pClearDone"${plan.completed.size ? "" : " disabled"}>Clear completed</button></footer>`;
   return h;
@@ -1140,21 +1141,21 @@ function renderDetails() {
   const unlocks = [...new Set([...[...state.courses.values()].filter(o => [...o.prereqs, ...o.coreqs].some(g => g.includes(c.code))).map(o => o.code), ...shownCap.map(o => o.code)])].sort(cmpCode);
   const hl = state.highlights.find(h => h.code === c.code);
   let html = `<header><span class="dcode">${esc(c.code)}</span><span class="hbtns">${plan.on ? `<button class="btn ghost sd-btn sd-small sd-ghost" type="button" id="dBack" title="Back to the plan panel">← plan</button>` : ""}<button class="xbtn sd-x" type="button" id="dClose" aria-label="Close details">×</button></span>
-    <div class="dname">${esc(c.name)}</div><div class="dsem">${semLabel(c.semester)} · ${semLong(c.semester)}</div></header><div class="dbody">`;
+    <div class="dname">${esc(c.name)}</div><div class="dsem">${semLong(c.semester)}</div></header><div class="dbody">`;
   if (plan.on) html += planDetailsHtml(c);
   html += `<h3>Highlight tree</h3><div class="hlrow"><div class="seg sd-seg" role="group" aria-label="Highlight tree">${Object.entries(DIRS).map(([k, v]) =>
     `<button type="button" data-hl="${k}" aria-pressed="${!!hl && hl.dir === k}">${v}</button>`).join("")}</div><button type="button" class="btn sd-btn sd-small" id="dZoom">Zoom to chain</button></div>`;
   const yrs = PFPlan.rules(c).yearsComplete;
   const capPre = yrs && view && view.nodes.has(c.code) ? view.preds.get(c.code).filter(x => !c.prereqs.some(g => g.includes(x))).length : 0;
-  html += `<h3>Prerequisites <span class="ct">${c.prereqs.length + (yrs ? 1 : 0)}</span></h3>` + (c.prereqs.length ? `<div class="groups">${groupsHtml(c.prereqs, "n")}</div>` : yrs ? "" : `<p class="plain muted">None listed.</p>`);
+  html += `<h3>Prerequisites</h3>` + (c.prereqs.length ? `<div class="groups">${groupsHtml(c.prereqs, "n")}</div>` : yrs ? "" : `<p class="plain muted">None listed.</p>`);
   if (yrs) html += `<p class="plain${c.prereqs.length ? " mt" : ""}">Every program course in years 1–${yrs}${capPre ? `: ${plural(capPre, "course")} shown, linked along the bottom of the sheet` : ""}.</p>`;
   const cr = PFPlan.rules(c).minCredits;
   if (cr) html += `<p class="plain mt">At least ${cr} credit hours completed (${Math.ceil(cr / PFPlan.CREDITS)} courses at 3 credit hours each). Not drawn as links.</p>`;
-  if (c.coreqs.length) html += `<h3>Corequisites <span class="ct">${c.coreqs.length}</span></h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted mt">Taken before or alongside; drawn like prerequisites.</p>`;
-  html += `<h3>Required by <span class="ct">${unlocks.length}</span></h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
+  if (c.coreqs.length) html += `<h3>Corequisites</h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted mt">Taken before or alongside; drawn like prerequisites.</p>`;
+  html += `<h3>Required by</h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
   if (c.notes.length) html += `<h3>Notes</h3>${c.notes.map(n => `<p class="plain">${esc(n)}</p>`).join("")}`;
   if (c.ignored.length) html += `<h3>Ignored from the source</h3>${c.ignored.map(n => `<p class="plain muted">${esc(n)}</p>`).join("")}`;
-  if (c.programs.length) html += `<h3>Listed in <span class="ct">${c.programs.length}</span></h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}</li>`).join("")}</ul>`;
+  if (c.programs.length) html += `<h3>Listed in</h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}</li>`).join("")}</ul>`;
   html += `</div><footer><button class="btn sd-btn sd-small" type="button" id="dEdit">Edit</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="dDelete">Delete</button></footer>`;
   d.innerHTML = html;
   d.hidden = false;
@@ -1194,10 +1195,6 @@ function scrollToCard(code) {
 // ───────────────────────── page chrome ─────────────────────────
 function syncControls() {
   const has = state.courses.size > 0;
-  const nEdges = [...state.courses.values()].reduce((n, c) => n + [...c.prereqs, ...c.coreqs].reduce((k, g) => k + g.filter(x => state.courses.has(x)).length, 0), 0);
-  $("#sheetInfo").textContent = has
-    ? `${plural(state.courses.size, "course")} · ${plural(state.programs.length, "program")} · ${plural(nEdges, "link")}`
-    : "No courses loaded";
   $("#searchWrap").hidden = !has;
   $("#legendProg").hidden = state.programs.length < 2;
   $("#btnExport").disabled = !has;
@@ -1234,10 +1231,8 @@ function syncPlanbar(has = state.courses.size > 0) {
   $$("#brushSeg button").forEach(b => b.setAttribute("aria-checked", String(b.dataset.brush === plan.brush)));
   const P = planInfo();
   const vis = view ? view.visible : visibleCourses();
-  const ready = vis.filter(c => P.status.get(c.code).state === "ready").length;
-  const path = P.path;
-  $("#planStats").innerHTML = `<b>${P.count}</b> completed · <b>${P.credits}</b> credit hours · <b>${ready}</b> available now`
-    + (path ? ` · <b>${path.needed.size}</b> ${path.needed.size === 1 ? "course" : "courses"} to go for ${plural(path.goals.length, "goal")}${path.steps.length > 1 ? ` (${path.steps.length} steps)` : ""}` : "");
+  const n = planCounts(vis.map(c => c.code), P);
+  $("#planStats").innerHTML = `<b>${n.done}</b>/${plural(vis.length, "course")} completed · <b>${n.ready}</b> currently available`;
   $("#btnPlanPanel").setAttribute("aria-pressed", String(plan.panel && !state.selected));
 }
 function render() {
@@ -1288,7 +1283,6 @@ function openWelcome() {
     const progs = [...DEFAULT.programs].sort((a, b) => a.localeCompare(b));
     sel.innerHTML = `<option value="">All ${progs.length} programs (${DEFAULT.courses.length} courses)</option>`
       + progs.map(p => `<option value="${esc(p)}">${esc(shortProg(p))} (${DEFAULT.courses.filter(c => (c.programs || []).includes(p)).length})</option>`).join("");
-    $("#wDefaultInfo").textContent = `All engineering programs and specializations, parsed from the official program maps: ${DEFAULT.courses.length} courses.`;
   } else {
     sel.innerHTML = `<option value="">Built-in data missing</option>`;
     $("#wDefault").disabled = true;
@@ -1432,7 +1426,7 @@ function openEdit(code) {
   editing = code && state.courses.get(code) ? code : null;
   const c = editing ? state.courses.get(editing) : null;
   const n = Math.max(state.semCount, ...[...state.courses.values()].map(x => x.semester), c ? c.semester : 1);
-  $("#fSem").innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i + 1}">${semLabel(i + 1)} · ${semLong(i + 1)}</option>`).join("");
+  $("#fSem").innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i + 1}">${semLong(i + 1)}</option>`).join("");
   $("#editTitle").textContent = c ? `Edit ${c.code}` : "Add course";
   $("#fCode").value = c ? c.code : "";
   $("#fCode").readOnly = !!c;
@@ -1523,7 +1517,7 @@ function buildExport(kind, onlyFilter) {
     const data = {
       format: "prereqflow", version: 1, exportedAt: new Date().toISOString(), semesters: state.semCount,
       programs: state.programs.filter(p => programs.includes(p)),
-      courses: list.map(c => ({ code: c.code, name: c.name, semester: c.semester, term: semLabel(c.semester), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs })),
+      courses: list.map(c => ({ code: c.code, name: c.name, semester: c.semester, term: PF.semesterLabel(c.semester), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs })),
     };
     if (plan.completed.size || plan.goals.length) data.plan = { completed: [...plan.completed].sort(cmpCode), goals: plan.goals.slice() };
     return { filename: base + ".json", data: JSON.stringify(data, null, 2) + "\n", mime: "application/json" };
@@ -1532,10 +1526,10 @@ function buildExport(kind, onlyFilter) {
     const q = v => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
     const fmt = gs => gs.map(g => g.join(" or ")).join(", ");
     const lines = [["Code", "Name", "Semester", "Year-Semester", "Prerequisites", "Corequisites", "Notes", "Ignored", "Programs"].join(",")];
-    for (const c of list) lines.push([c.code, c.name, String(c.semester), semLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; ")].map(q).join(","));
+    for (const c of list) lines.push([c.code, c.name, String(c.semester), PF.semesterLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; ")].map(q).join(","));
     return { filename: base + ".csv", data: "﻿" + lines.join("\r\n") + "\r\n", mime: "text/csv" };
   }
-  const out = [`# PrereqFlow export · ${today()} · ${plural(list.length, "course")}`, "# One course per line: CODE Name (prerequisites, Coreq: …). A line like 2-1 sets year-semester for the lines below it.", ""];
+  const out = ["# PrereqFlow export", "# One course per line: CODE Name (prerequisites, Coreq: …). A line like Year 2 Sem 1 sets the semester for the lines below it.", ""];
   let sem = 0;
   for (const c of list) {
     if (c.semester !== sem) { if (sem) out.push(""); sem = c.semester; out.push(semLabel(sem)); }
@@ -1737,9 +1731,7 @@ function buildImageSpec(o) {
       chrome.push({ t: "path", d: `M${x},${titleH} V${top}`, stroke: major ? P.rule : P.rule2, sw: 1, dash: major ? null : [4, 4] });
     }
     const l = labels[k], lx = X(lay.colX(k));
-    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.main, size: 13.5, weight: 700, color: P.ink });
-    chrome.push({ t: "text", x: lx + PFImage.measure(l.main, 13.5, 700) + 8, y: titleH + 25, text: lay.mode === "semester" ? `${l.band.toLowerCase()} · ${l.sub}` : l.sub, size: 11, color: P.ink3 });
-    chrome.push({ t: "text", x: lx + D.colW, y: titleH + 25, text: String(l.n), size: 11, color: P.ink3, anchor: "end" });
+    chrome.push({ t: "text", x: lx, y: titleH + 25, text: l.band ? `${l.band} ${l.main}` : l.main, size: 13.5, weight: 700, color: P.ink });
   }
   chrome.push({ t: "path", d: `M0,${top - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
 
@@ -1759,10 +1751,12 @@ function buildImageSpec(o) {
   ops.push(...edgeOps, ...hiOps);
 
   // cards
+  const drawn = [];
   for (const c of lay.visible) {
     const n = lay.nodes.get(c.code);
     const x = X(n.x), y = Y(n.y);
     if (x > W || x + n.w < 0 || y > top + chH || y + n.h < top) continue;
+    drawn.push(c.code);
     const tc = trees.cards.get(c.code);
     const hc = tc ? P.h[tc[0]] : null;
     const pc = PI ? planCard(c.code, PI, goals, path, P) : null;
@@ -1813,7 +1807,7 @@ function buildImageSpec(o) {
     const prog = state.filter ? (state.filter === MANUAL ? "Added by hand" : shortProg(state.filter)) : state.programs.length > 1 ? `All ${state.programs.length} programs` : state.programs.length ? shortProg(state.programs[0]) : "Courses";
     const what = scope.id === "trees" ? `highlighted trees: ${state.highlights.filter(h => lay.nodes.has(h.code)).map(h => `${h.code} (${DIRS[h.dir]})`).join(", ")}`
       : scope.id === "chain" ? `prerequisite chain of ${state.selected}` : scope.id === "window" ? "visible area"
-      : scope.id === "path" ? `goal path to ${goals.goals.join(", ")}` : PI ? "full sheet with plan" : "full sheet";
+      : scope.id === "path" ? "goal path" : PI ? "full sheet with plan" : "full sheet";
     ops.push({ t: "rect", x: 0, y: 0, w: W, h: titleH, fill: P.head });
     ops.push({ t: "path", d: `M0,${titleH - 0.5} H${W}`, stroke: P.rule2, sw: 1 });
     const pre = "PREREQ", sl = "/";
@@ -1822,8 +1816,10 @@ function buildImageSpec(o) {
     ops.push({ t: "text", x: x1, y: 32, text: sl, size: 19, color: P.accent });
     ops.push({ t: "text", x: x1 + PFImage.measure(sl, 19) + 3, y: 32, text: "FLOW", size: 19, weight: 700, color: P.ink, ls: 3 });
     ops.push({ t: "text", x: D.padL, y: 54, text: `${prog} · ${what}`, size: 12.5, color: P.ink2 });
-    const planLine = PI ? ` · ${PI.count} completed (${PI.credits} credit hours) · ${view.visible.filter(v => PI.status.get(v.code).state === "ready").length} available now${goals && goals.needed.size ? ` · ${goals.needed.size} to go for ${plural(goals.goals.length, "goal")}` : ""}` : "";
-    ops.push({ t: "text", x: D.padL, y: 72, text: `${lay.mode === "free" ? "free flow" : "by semester"} · ${plural(lay.visible.length, "course")} · ${plural(lay.edges.length, "link")}${planLine} · ${today()}`, size: 11.5, color: P.ink3 });
+    if (PI) { // counted over the cards in this image only
+      const n = planCounts(drawn, PI);
+      ops.push({ t: "text", x: D.padL, y: 72, text: `${n.done}/${plural(drawn.length, "course")} completed · ${n.ready} currently available`, size: 11.5, color: P.ink3 });
+    }
     // credit badge, top right
     const by = "made by areeb";
     const bw = Math.max(PFImage.measure(by, 16, 700), PFImage.measure(SITE, 13, 400)) + 32;
@@ -1890,7 +1886,7 @@ function planCard(code, PI, goals, path, P) {
 // the goal path as lines of text for the band under an exported chart
 function planBand(goals, maxW) {
   if (!goals || !goals.goals.length) return [];
-  const lines = [{ label: "GOAL PATH", text: `◎ ${goals.goals.join(", ")} · ${goals.needed.size ? `${plural(goals.needed.size, "course")} to go in ${plural(goals.steps.length, "step")}` : "nothing left to take"}`, head: true }];
+  const lines = [{ label: "GOAL PATH", text: `◎ ${goals.goals.join(", ")}${goals.needed.size ? "" : " · nothing left to take"}`, head: true }];
   const fit = (codes, label) => { // codes never break across lines
     let cur = "";
     for (const c of codes) {

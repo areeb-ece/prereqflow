@@ -131,7 +131,6 @@ async function check(name, fn) {
         await wait(700);
         assert.ok(await page.isHidden("#welcomeDlg"));
         assert.equal(await cardCount(), 158);
-        assert.match((await page.textContent("#sheetInfo")).toLowerCase(), /158 courses · 16 programs · 266 links/);
       });
       await shot("2-sheet");
 
@@ -181,12 +180,12 @@ async function check(name, fn) {
         await page.click("#zFit");
         await wait(700);
         assert.ok(await page.isHidden("#semCount"), "no semester count in free flow");
-        assert.match(await page.textContent("#colhead"), /T1/);
+        assert.match(await page.textContent("#colhead"), /Tier 1/);
         await tap('#modeSeg [data-mode="semester"]');
         await wait(800);
         await page.selectOption(await tool("#semCount"), "10");
         await wait(300);
-        assert.match(await page.textContent("#colhead"), /5-2|Y5|Year 5/);
+        assert.match(await page.textContent("#colhead"), /Y5|Year 5/);
         await page.selectOption(await tool("#semCount"), "8");
         await wait(300);
         if (await sheetOpen()) await page.click("#btnMenu");
@@ -199,7 +198,7 @@ async function check(name, fn) {
         await page.hover('.card[data-code="ELEE 2250U"]', { force: true });
         await wait(150);
         assert.ok(await visible("#readout"), "readout");
-        assert.match(await page.textContent("#readout"), /in prerequisite chain/);
+        assert.match(await page.textContent("#readout"), /ELEE 2250U/);
         assert.ok((await page.$$eval(".card.is-needs", c => c.length)) > 0, "needs lit");
         await page.mouse.move(5, h - 5);
       });
@@ -331,12 +330,12 @@ async function check(name, fn) {
         assert.ok(await visible("#planbar"));
         assert.ok(await visible("#details"), "plan panel opens");
         assert.match(await page.textContent("#details .dcode"), /Plan/);
-        assert.match(await page.textContent("#planStats"), /0\s*completed/);
+        assert.match(await page.textContent("#planStats"), /^0\/158 courses completed · \d+ currently available$/);
         await clickCard("MATH 1010U");
         await wait(300);
         assert.match(await toast(), /MATH 1010U completed/);
         assert.ok(await page.$eval('.card[data-code="MATH 1010U"]', e => e.classList.contains("p-done")));
-        assert.match(await page.textContent("#planStats"), /1\s*completed · 3\s*credit hours/);
+        assert.match(await page.textContent("#planStats"), /^1\/158 courses completed/);
         await page.click('#brushSeg [data-brush="goal"]');
         await clickCard("ELEE 2250U");
         await wait(300);
@@ -368,9 +367,9 @@ async function check(name, fn) {
         await page.click("#pClearDone");
         assert.match(await page.textContent("#pClearDone"), /Clear all 1\?/);
         await page.click("#pClearDone");
-        assert.match(await page.textContent("#planStats"), /0\s*completed/);
+        assert.match(await page.textContent("#planStats"), /^0\/158 courses completed · \d+ currently available$/);
         await toastAct();
-        assert.match(await page.textContent("#planStats"), /1\s*completed/);
+        assert.match(await page.textContent("#planStats"), /^1\/158 courses completed/);
         await page.click('#brushSeg [data-brush="done"]');
       });
 
@@ -383,7 +382,7 @@ async function check(name, fn) {
         await wait(600);
         assert.equal(await cardCount(), 158);
         assert.ok(await visible("#planbar"), "plan mode remembered");
-        assert.match(await page.textContent("#planStats"), /1\s*completed/);
+        assert.match(await page.textContent("#planStats"), /^1\/158 courses completed/);
         await page.keyboard.press("p");
         await wait(300);
         if (phone) assert.ok(await page.isHidden("#planbar"), "p (via keyboard) leaves plan mode");
