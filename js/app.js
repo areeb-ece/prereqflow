@@ -1208,12 +1208,10 @@ function syncControls() {
   const showFilter = has && (state.programs.length > 1 || (state.programs.length && manual));
   pf.hidden = !showFilter;
   if (showFilter) {
-    const counts = new Map(state.programs.map(p => [p, 0]));
-    for (const c of state.courses.values()) for (const p of c.programs) counts.set(p, (counts.get(p) || 0) + 1);
     const progs = [...state.programs].sort((a, b) => a.localeCompare(b));
-    pf.innerHTML = `<option value="">All ${state.programs.length} programs (${state.courses.size})</option>`
-      + progs.map(p => `<option value="${esc(p)}">${esc(shortProg(p))} (${counts.get(p) || 0})</option>`).join("")
-      + (manual ? `<option value="${MANUAL}">Added by hand (${manual})</option>` : "");
+    pf.innerHTML = `<option value="">All programs</option>`
+      + progs.map(p => `<option value="${esc(p)}">${esc(shortProg(p))}</option>`).join("")
+      + (manual ? `<option value="${MANUAL}">Added by hand</option>` : "");
     pf.value = state.filter;
     if (pf.value !== state.filter) { state.filter = ""; pf.value = ""; }
   } else state.filter = "";
@@ -1281,8 +1279,8 @@ function openWelcome() {
   const sel = $("#wProgram");
   if (DEFAULT) {
     const progs = [...DEFAULT.programs].sort((a, b) => a.localeCompare(b));
-    sel.innerHTML = `<option value="">All ${progs.length} programs (${DEFAULT.courses.length} courses)</option>`
-      + progs.map(p => `<option value="${esc(p)}">${esc(shortProg(p))} (${DEFAULT.courses.filter(c => (c.programs || []).includes(p)).length})</option>`).join("");
+    sel.innerHTML = `<option value="">All programs</option>`
+      + progs.map(p => `<option value="${esc(p)}">${esc(shortProg(p))}</option>`).join("");
   } else {
     sel.innerHTML = `<option value="">Built-in data missing</option>`;
     $("#wDefault").disabled = true;
@@ -1567,7 +1565,7 @@ function renderMenu() {
     <button type="button" role="menuitem" data-dl="json"><b>JSON · all ${n} courses</b><small>Everything, including programs and your plan (completed and goal courses). Import it again to pick up where you left off.</small></button>
     <button type="button" role="menuitem" data-dl="csv"><b>CSV spreadsheet</b><small>One row per course, for Excel or Sheets. Imports back too.</small></button>
     <button type="button" role="menuitem" data-dl="txt"><b>Text lines</b><small>One line per course, grouped by semester. Pastes back into Line input.</small></button>`;
-  if (f && fn) h += `<hr><button type="button" role="menuitem" data-dl="json" data-only="1"><b>JSON · only ${esc(fname)}</b><small>The ${plural(fn, "course")} currently shown.</small></button>`;
+  if (f && fn) h += `<hr><button type="button" role="menuitem" data-dl="json" data-only="1"><b>JSON · only ${esc(fname)}</b><small>The courses currently shown.</small></button>`;
   $("#exportMenu").innerHTML = h;
 }
 function openMenu() { renderMenu(); $("#exportMenu").hidden = false; $("#btnExport").setAttribute("aria-expanded", "true"); const b = $("#exportMenu button"); if (b) b.focus(); }
@@ -1630,7 +1628,7 @@ function imageScopes() {
   const treeSet = new Set(hs.flatMap(treeCodes));
   const chain = sel ? [...new Set([...closure(sel, view.preds), ...closure(sel, view.succs)])] : [];
   const vis = view ? view.visible.length : 0;
-  const filt = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : (state.programs.length > 1 ? `all ${state.programs.length} programs` : "all courses");
+  const filt = state.filter ? (state.filter === MANUAL ? "added by hand" : shortProg(state.filter)) : (state.programs.length > 1 ? "all programs" : "all courses");
   // the goals, the courses still needed for them, and the completed courses that lead straight in
   const path = view && state.courses.size ? planInfo().path : null;
   let pathCodes = [];
@@ -1640,11 +1638,11 @@ function imageScopes() {
     pathCodes = [...on];
   }
   return [
-    { id: "view", label: `Shown · ${vis}`, hint: `Every course on the sheet (${filt}).`, codes: null, ok: vis > 0 },
-    { id: "trees", label: `Highlighted trees · ${treeSet.size}`, hint: hs.length ? `Trees of ${hs.map(h => h.code).join(", ")}, laid out on their own.` : "Highlight a tree first (shift+click a course, or use the course panel).", codes: [...treeSet], ok: treeSet.size > 0 },
-    { id: "chain", label: sel ? `${sel} chain · ${chain.length}` : "Pinned course chain", hint: sel ? `${sel} with everything it needs and unlocks, laid out on its own.` : "Click a course to pin it first.", codes: chain, ok: chain.length > 0 },
+    { id: "view", label: "Shown", hint: `Every course on the sheet (${filt}).`, codes: null, ok: vis > 0 },
+    { id: "trees", label: "Highlighted trees", hint: hs.length ? `Trees of ${hs.map(h => h.code).join(", ")}, laid out on their own.` : "Highlight a tree first (shift+click a course, or use the course panel).", codes: [...treeSet], ok: treeSet.size > 0 },
+    { id: "chain", label: sel ? `${sel} chain` : "Pinned course chain", hint: sel ? `${sel} with everything it needs and unlocks, laid out on its own.` : "Click a course to pin it first.", codes: chain, ok: chain.length > 0 },
     { id: "window", label: "Visible area", hint: "Exactly the part of the sheet on screen, at the current layout.", codes: null, ok: vis > 0 },
-    { id: "path", label: `Goal path · ${pathCodes.length}`, hint: path ? `Goals ${path.goals.join(", ")}, the courses still needed for them and the completed courses leading in, laid out on their own.` : "Set a goal in plan mode first.", codes: pathCodes, ok: pathCodes.length > 0, plan: true },
+    { id: "path", label: "Goal path", hint: path ? `Goals ${path.goals.join(", ")}, the courses still needed for them and the completed courses leading in, laid out on their own.` : "Set a goal in plan mode first.", codes: pathCodes, ok: pathCodes.length > 0, plan: true },
   ];
 }
 function openImageDlg() {
