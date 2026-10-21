@@ -120,8 +120,8 @@
       <button type="button" class="pct" id="zPct" title="Actual size  [1]">100%</button>
       <button type="button" id="zIn" aria-label="Zoom in" title="Zoom in  [+]"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M8 3.5v9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
       <button type="button" id="zFit" title="Fit to screen  [0]">Fit</button>
-      <span class="div"></span>
-      <button type="button" id="zMotion" aria-pressed="true" title="Ambient motion on or off (the same switch as Animations in the settings)">Motion</button>
+      <span class="div" hidden></span>
+      <button type="button" id="zMotion" aria-pressed="true" title="Ambient motion on or off" hidden>Motion</button>
     </div>
     <div class="readout" id="readout" hidden></div>
     <div class="credit" id="credit" hidden>made by areeb · <a href="https://areeb-ece.github.io/prereqflow/" target="_blank" rel="noopener">areeb-ece.github.io/prereqflow</a></div>
@@ -181,11 +181,8 @@
 <div class="overlay" id="welcomeDlg" hidden>
   <div class="dialog welcome sd-dialog sd-pin1" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <header class="tblock">
-      <div>
-        <h2 id="welcomeTitle" class="sd-wordmark">PREREQ<span>/</span>FLOW</h2>
-        <p>Course prerequisite flowcharts: every prerequisite drawn as a link, traced on hover.</p>
-      </div>
-      <dl class="tmeta"><dt>Sheet</dt><dd id="wDate"></dd></dl>
+      <h2 id="welcomeTitle" class="sd-wordmark">PREREQ<span>/</span>FLOW</h2>
+      <p>Course prerequisite flowcharts: every prerequisite drawn as a link, traced on hover.</p>
     </header>
     <div class="resume" id="wResume" hidden>
       <div><b>Pick up where you left off</b><span id="wResumeInfo"></span></div>

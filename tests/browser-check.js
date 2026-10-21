@@ -112,7 +112,6 @@ async function check(name, fn) {
       await check("start screen opens with every program", async () => {
         assert.ok(await visible("#welcomeDlg"), "start screen visible");
         assert.equal(await page.$$eval("#wProgram option", o => o.length), 17);
-        assert.match(await page.textContent("#wDate"), /^\d{4}-\d\d-\d\d$/);
         assert.ok(await page.isHidden("#wResume"), "no resume on a first visit");
       });
       await check("start screen can't be dismissed while empty", async () => {
@@ -581,14 +580,17 @@ async function check(name, fn) {
           await wait(800);
           assert.ok((await z()) < 100, "wheel zooms out");
         }
-        // the run starts with motion off; the switch turns it on and off again
+        // the run starts with motion off; the switch turns it on and off again. Online that
+        // switch is the gear's Animations setting; offline the zoom bar has its own.
         assert.equal(await page.getAttribute("html", "data-motion"), "off");
-        await page.click("#zMotion");
+        assert.equal(await page.isVisible("#zMotion"), !DESIGN, DESIGN ? "no second motion switch beside the gear's" : "offline motion switch shown");
+        const motion = on => DESIGN ? page.evaluate(m => SiteDesign.set({ motion: m }), on) : page.click("#zMotion");
+        await motion(true);
         assert.equal(await page.getAttribute("html", "data-motion"), null);
         assert.equal(await page.getAttribute("#zMotion", "aria-pressed"), "true");
         await wait(300);
         assert.ok(await page.evaluate(() => document.getAnimations().some(a => a.effect && a.effect.target && a.effect.target.classList.contains("card"))), "cards float");
-        await page.click("#zMotion");
+        await motion(false);
         assert.equal(await page.getAttribute("html", "data-motion"), "off");
         assert.equal(await page.getAttribute("#zMotion", "aria-pressed"), "false");
       });

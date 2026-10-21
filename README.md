@@ -167,16 +167,15 @@ The sheet is never still:
 
 - Every course card floats on a slow wave that ripples across the sheet, plus a small
   wobble of its own. Links stay attached to the cards as they move.
-- A soft sheen sweeps across each card from time to time, and a faint light and a
-  field of stars drift slowly behind the sheet.
+- A faint light and a field of stars drift slowly behind the sheet.
 - Traced and highlighted links carry small particles that flow towards the course
   they unlock.
 - Cards fade in when a sheet loads and glide to their new places when you switch
   layouts or programs.
 
-The **Motion** button in the zoom control turns all of this off (it's the same switch as
-**Animations** in the settings menu, so it applies to every site). If your system asks
-for reduced motion, the sheet holds still: no float, sheen or particles, and zooming
+**Animations** in the settings menu turns all of this off (it applies to every site;
+opened offline, a **Motion** button in the zoom control does it instead). If your system
+asks for reduced motion, the sheet holds still: no float or particles, and zooming
 jumps instead of gliding.
 
 ### Themes and settings

@@ -643,11 +643,10 @@ function renderChart() {
 
   $("#cards").innerHTML = view.visible.map(c => {
     const p = nodes.get(c.code);
-    const h = hashCode(c.code);
     const fresh = !before || !before.has(c.code);
-    const drift = `--sd:${(9 + (h % 70) / 10).toFixed(1)}s;--sdl:-${((h >>> 8) % 160) / 10}s${fresh ? `;--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : ""}`;
+    const delay = fresh ? `--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : "";
     const rq = ruleTag(c);
-    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${drift}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${rq ? `<i class="rq" title="${esc(rq.title)}">${esc(rq.text)}</i>` : ""}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="pm"></span><span class="marks"></span></button>`;
+    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${delay}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${rq ? `<i class="rq" title="${esc(rq.title)}">${esc(rq.text)}</i>` : ""}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="pm"></span><span class="marks"></span></button>`;
   }).join("");
   cardEls = new Map($$("#cards .card").map(el => [el.dataset.code, el]));
   // cards that were already on the sheet glide from their old spot; links fade back in
@@ -1301,7 +1300,6 @@ function openWelcome() {
     const fmt = isNaN(when) ? "" : when.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     $("#wResumeInfo").textContent = `${plural(saved.data.courses.length, "course")}${saved.data.programs && saved.data.programs.length ? ` · ${plural(saved.data.programs.length, "program")}` : ""}${fmt ? ` · saved ${fmt}` : ""}`;
   }
-  $("#wDate").textContent = today();
   $("#empty").hidden = true;
   openDialog("#welcomeDlg");
   setTimeout(() => $(saved ? "#wResumeBtn" : "#wDefault").focus(), 0); // a returning visitor's Enter resumes, never overwrites
@@ -2188,6 +2186,8 @@ $("#fDelete").addEventListener("click", e => arm(e.currentTarget, "Click again t
 $("#zIn").addEventListener("click", () => zoomBy(1.3));
 $("#zOut").addEventListener("click", () => zoomBy(1 / 1.3));
 $("#zPct").addEventListener("click", () => zoomBy(1 / zoom));
+// Online the gear's Animations switch does this; offline the zoom bar carries its own.
+if (!shared) for (const el of [$("#zMotion"), $("#zMotion").previousElementSibling]) el.hidden = false;
 $("#zMotion").addEventListener("click", () => setMotion(document.documentElement.dataset.motion === "off"));
 $("#zFit").addEventListener("click", () => fitAll());
 const vp = $("#viewport");
