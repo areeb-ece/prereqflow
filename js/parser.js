@@ -541,12 +541,28 @@ const PF = (() => {
     return lvl >= 1 && lvl <= 8 ? (lvl - 1) * 2 + 1 : 1;
   }
 
+  // A course can sit in different semesters in different programs (Thermodynamics and
+  // Heat Transfer is 2-1 in Automotive but 3-1 in Mechatronics). `semesters` holds each
+  // program's own semester; `semester` is the fallback for programs without an entry,
+  // for the all-programs view (the earliest) and for courses added by hand.
   function mkCourse(p, semester, program) {
     return {
       code: p.code, name: p.name, semester,
+      semesters: program ? { [program]: semester } : {},
       prereqs: p.prereqs || [], coreqs: p.coreqs || [], notes: p.notes || [], ignored: p.ignored || [],
       programs: program ? [program] : [],
     };
+  }
+  // the semester a course is taken in, in a given program ("" or null: the fallback)
+  function semIn(c, program) {
+    return (program && c.semesters && c.semesters[program]) || c.semester;
+  }
+  // every listed program's semester, spelled out (a program without an entry takes the
+  // fallback), so that changing the fallback later can't move the others
+  function programSemesters(c) {
+    const out = { ...(c.semesters || {}) };
+    for (const p of c.programs || []) if (!out[p]) out[p] = c.semester;
+    return out;
   }
 
   // Union of requirement groups from two sources. Program maps often list only the
@@ -557,16 +573,17 @@ const PF = (() => {
     return all.filter(g => !all.some(h => h !== g && h.length > g.length && g.every(c => h.includes(c))));
   }
 
-  // Merge incoming records into a Map(code → course). Earliest semester wins.
-  function mergeInto(map, incoming, conflicts) {
+  // Merge incoming records into a Map(code → course). Each program keeps its own
+  // semester; the fallback `semester` is the earliest seen. Only a program listing the
+  // same course in two semesters is a real conflict, and there the earliest is kept.
+  function mergeInto(map, incoming) {
     for (const c0 of incoming) {
       const c = { ...c0, code: normCode(c0.code) };
       const ex = map.get(c.code);
-      if (!ex) { map.set(c.code, { ...c, prereqs: dedupeGroups(c.prereqs || []), coreqs: dedupeGroups(c.coreqs || []), notes: [...new Set(c.notes || [])], ignored: [...new Set(c.ignored || [])], programs: [...new Set(c.programs || [])] }); continue; }
-      if (ex.semester !== c.semester && conflicts) {
-        conflicts.push({ code: c.code, kept: Math.min(ex.semester, c.semester), dropped: Math.max(ex.semester, c.semester), keptFrom: ex.semester <= c.semester ? (ex.programs || []).join(", ") : (c.programs || []).join(", "), droppedFrom: ex.semester <= c.semester ? (c.programs || []).join(", ") : (ex.programs || []).join(", ") });
-      }
-      ex.semester = Math.min(ex.semester, c.semester);
+      if (!ex) { map.set(c.code, { ...c, semesters: { ...(c.semesters || {}) }, prereqs: dedupeGroups(c.prereqs || []), coreqs: dedupeGroups(c.coreqs || []), notes: [...new Set(c.notes || [])], ignored: [...new Set(c.ignored || [])], programs: [...new Set(c.programs || [])] }); continue; }
+      ex.semesters = programSemesters(ex);
+      for (const [prog, sem] of Object.entries(programSemesters(c))) ex.semesters[prog] = ex.semesters[prog] ? Math.min(ex.semesters[prog], sem) : sem;
+      ex.semester = Math.min(ex.semester, c.semester, ...Object.values(ex.semesters));
       if ((!ex.name || ex.name === ex.code) && c.name) ex.name = c.name;
       ex.prereqs = unionGroups(ex.prereqs, c.prereqs);
       ex.coreqs = unionGroups(ex.coreqs, c.coreqs);
@@ -625,7 +642,7 @@ const PF = (() => {
     parseCourseText, splitEntries, joinLines,
     itemsToLines, extractTable, linesToText,
     programFromFilename, cleanTitle, semesterFromCode,
-    mkCourse, mergeInto, resolveCodes, requirementText, courseToLine, semesterLabel,
+    mkCourse, semIn, programSemesters, mergeInto, resolveCodes, requirementText, courseToLine, semesterLabel,
   };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = PF;

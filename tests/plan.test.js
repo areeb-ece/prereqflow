@@ -149,3 +149,17 @@ test("either/or in a goal path: every goal in a program stays inside it when it 
   }
 });
 const shortName = p => p.replace(/ 2026-2027$/, "");
+
+test("each program's own semester decides which courses its capstone counts", () => {
+  // MECE 2640U is year 2 in Automotive but year 3 semester 1 in Mechatronics
+  const MECHA = "Mechatronics Engineering 2026-2027", AUTO = "Automotive Engineering 2026-2027";
+  const c = all.get("MECE 2640U");
+  assert.equal(PFPlan.semIn(c, MECHA), 5);
+  assert.equal(PFPlan.semIn(c, AUTO), 3);
+  const cap = all.get("ENGR 4111U");
+  const pool = PFPlan.yearsPool(all, new Set(), MECHA, cap, 3);
+  assert.ok(pool.list.includes("MECE 2640U"), "year 3 semester 1 is within years 1–3");
+  const two = PFPlan.yearsPool(all, new Set(), MECHA, cap, 2);
+  assert.ok(!two.list.includes("MECE 2640U"), "not a year 1–2 course in Mechatronics");
+  assert.ok(PFPlan.yearsPool(all, new Set(), AUTO, cap, 2).list.includes("MECE 2640U"), "but it is in Automotive");
+});

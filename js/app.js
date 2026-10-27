@@ -104,14 +104,24 @@ function toGroups(v) {
     return [...r.prereqs, ...r.coreqs];
   });
 }
+const readSem = v => (typeof v === "string" ? PF.parseSemesterLabel(v) || parseInt(v, 10) : +v) || 0;
+// { program: semester } from an export (numbers or "3-1" labels); bad entries are dropped
+function readSemesters(v) {
+  const out = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    for (const [prog, sem] of Object.entries(v)) { const n = readSem(sem); if (prog && n) out[String(prog)] = clampSem(n); }
+  }
+  return out;
+}
 function normalizeCourse(c) {
   const code = PF.normCode(c.code);
-  let sem = c.semester;
-  if (typeof sem === "string") sem = PF.parseSemesterLabel(sem) || parseInt(sem, 10);
+  const semesters = readSemesters(c.semesters);
+  const sem = readSem(c.semester) || Math.min(...Object.values(semesters));
   return {
     code,
     name: String(c.name || "").trim() || code,
-    semester: clampSem(sem || PF.semesterFromCode(code)),
+    semester: clampSem(isFinite(sem) && sem ? sem : PF.semesterFromCode(code)),
+    semesters,
     prereqs: PF.dedupeGroups(toGroups(c.prereqs)),
     coreqs: PF.dedupeGroups(toGroups(c.coreqs)),
     notes: Array.isArray(c.notes) ? c.notes.map(String) : [],
@@ -266,7 +276,9 @@ function fromCsv(text, fileName) {
   if (iCode < 0) return fromText(rows.map(r => r.join(" ")).join("\n"), PF.programFromFilename(fileName), fileName, "CSV");
   const iName = col("name", "course name", "title"), iSem = col("semester", "sem", "semester number"), iYT = col("year-semester", "year-term", "term", "term label");
   const iPre = col("prerequisites", "prerequisite", "prereqs", "prereq", "requires"), iCo = col("corequisites", "corequisite", "coreqs", "coreq");
-  const iNotes = col("notes", "note"), iIgn = col("ignored", "ignored text"), iProg = col("programs", "program");
+  const iNotes = col("notes", "note"), iIgn = col("ignored", "ignored text"), iProg = col("programs", "program"), iPS = col("program semesters");
+  // "Program A = 2-1; Program B = 3-1" (program names can contain ":" but not "=" or ";")
+  const progSems = s => Object.fromEntries(splitList(s).map(x => { const i = x.lastIndexOf("="); return i > 0 ? [x.slice(0, i).trim(), x.slice(i + 1).trim()] : null; }).filter(Boolean));
   const get = (r, i) => (i >= 0 && r[i] != null ? String(r[i]).trim() : "");
   const splitList = s => s ? s.split(/\s*[;|]\s*/).filter(Boolean) : [];
   const records = [];
@@ -278,7 +290,7 @@ function fromCsv(text, fileName) {
       code, name: get(r, iName), semester: get(r, iSem) || get(r, iYT),
       prereqs: [...pre.prereqs], coreqs: [...pre.coreqs, ...co.prereqs, ...co.coreqs],
       notes: [...splitList(get(r, iNotes)), ...pre.notes], ignored: [...splitList(get(r, iIgn)), ...pre.ignored],
-      programs: splitList(get(r, iProg)),
+      programs: splitList(get(r, iProg)), semesters: progSems(get(r, iPS)),
     }));
   }
   const rep = newReport(fileName, PF.programFromFilename(fileName), "CSV");
@@ -311,19 +323,26 @@ function mergeBatches(batches) {
   const before = snapshot();
   if (replaceOnImport) { clearSheet(); replaceOnImport = false; }
   const sizeBefore = state.courses.size;
-  // semester observations, to report conflicts (earliest wins)
+  // Semester observations per course and program. Different programs taking a course
+  // in different semesters is normal (each keeps its own); one program listing the
+  // same course in two semesters is a conflict, and the earliest is kept.
   const seen = new Map();
-  const note = (code, sem, label) => {
-    if (!seen.has(code)) seen.set(code, new Map());
-    const m = seen.get(code);
-    if (!m.has(sem)) m.set(sem, new Set());
-    m.get(sem).add(label);
+  const note = (code, program, sem, label, incoming) => {
+    const key = code + "\u241f" + program;
+    if (!seen.has(key)) seen.set(key, { code, program, sems: new Map(), incoming: false });
+    const e = seen.get(key);
+    if (!e.sems.has(sem)) e.sems.set(sem, new Set());
+    e.sems.get(sem).add(label);
+    if (incoming) e.incoming = true;
   };
   for (const b of batches) for (const r of b.records) {
-    const code = PF.normCode(r.code), ex = state.courses.get(code);
-    if (ex && !seen.has(code)) note(code, ex.semester, "already loaded");
+    const code = PF.normCode(r.code), ex = state.courses.get(code), prog = (r.programs && r.programs[0]) || "";
+    if (ex && (!prog || ex.programs.includes(prog))) note(code, prog, PF.semIn(ex, prog), "already loaded", false);
   }
-  for (const b of batches) for (const r of b.records) note(PF.normCode(r.code), r.semester, (r.programs && r.programs[0]) || b.label || "pasted text");
+  for (const b of batches) for (const r of b.records) {
+    const prog = (r.programs && r.programs[0]) || "";
+    note(PF.normCode(r.code), prog, PF.semIn(r, prog), prog || b.label || "pasted text", true);
+  }
 
   for (const b of batches) {
     PF.mergeInto(state.courses, b.records);
@@ -331,17 +350,19 @@ function mergeBatches(batches) {
     if (b.semCount && [4, 6, 8, 10, 12].includes(b.semCount)) state.semCount = Math.max(state.semCount, b.semCount);
   }
   const fixes = PF.resolveCodes(state.courses);
-  const maxSem = Math.max(0, ...[...state.courses.values()].map(c => c.semester));
+  const maxSem = Math.max(0, ...[...state.courses.values()].flatMap(c => [c.semester, ...Object.values(c.semesters || {})]));
   if (maxSem > state.semCount) state.semCount = [4, 6, 8, 10, 12].find(n => n >= maxSem) || 12;
 
   const conflicts = [];
-  for (const [code, m] of seen) {
-    if (m.size < 2) continue;
-    const sems = [...m.keys()].sort((a, b) => a - b);
-    conflicts.push({ code, kept: sems[0], all: sems.map(s => ({ sem: s, from: [...m.get(s)] })) });
+  for (const e of seen.values()) {
+    if (!e.incoming || e.sems.size < 2) continue;
+    const sems = [...e.sems.keys()].sort((a, b) => a - b);
+    conflicts.push({ code: e.code, program: e.program, kept: sems[0], all: sems.map(s => ({ sem: s, from: [...e.sems.get(s)] })) });
   }
   conflicts.sort((a, b) => cmpCode(a.code, b.code));
   const incomingCodes = new Set(batches.flatMap(b => b.records.map(r => PF.normCode(r.code))));
+  // courses whose timing differs between programs (informational, nothing was dropped)
+  const varied = [...incomingCodes].filter(code => { const c = state.courses.get(code); return c && new Set(Object.values(c.semesters || {})).size > 1; }).length;
   const missing = new Map();
   for (const code of incomingCodes) {
     const c = state.courses.get(code);
@@ -354,7 +375,7 @@ function mergeBatches(batches) {
   const fixMap = new Map(fixes.map(([a, b]) => [a, b]));
   lastUndo = before;
   persist();
-  return { added: state.courses.size - sizeBefore, total: state.courses.size, conflicts, fixes: [...fixMap], missing };
+  return { added: state.courses.size - sizeBefore, total: state.courses.size, conflicts, varied, fixes: [...fixMap], missing };
 }
 
 function showReport(reports, result, title) {
@@ -367,12 +388,13 @@ function showReport(reports, result, title) {
         <td class="num sd-num">${r.electives.length + r.restrictions}</td></tr>`).join("");
   let html = `<p class="rsum"><b>${plural(result.total, "course")}</b> loaded`
     + (result.added ? `, ${result.added} new` : "") + ` from ${plural(ok.length, "source")}.`
-    + (result.conflicts.length ? ` ${plural(result.conflicts.length, "course")} appeared in more than one semester; the earliest was kept.` : "") + `</p>`;
+    + (result.varied ? ` ${plural(result.varied, "course is", "courses are")} taken in different semesters in different programs; each program shows its own.` : "")
+    + (result.conflicts.length ? ` ${plural(result.conflicts.length, "course")} appeared twice in one program; the earliest was kept.` : "") + `</p>`;
   html += `<div class="rtable-wrap"><table class="rtable sd-table"><thead><tr><th>Source</th><th class="num sd-num">Courses</th><th class="num sd-num">Either/or</th><th class="num sd-num">Coreqs</th><th class="num sd-num">Skipped</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   html += `<p class="help mt">Skipped counts elective slots and credit-restriction notes, which aren't prerequisites.</p>`;
   if (result.conflicts.length) {
-    html += `<div class="rsec"><h3>Semester conflicts · earliest kept</h3><ul>${result.conflicts.map(c =>
-      `<li>${esc(c.code)} → <b>${semLabel(c.kept)}</b> <span class="muted">(${esc(trimList(c.all[0].from))})</span>; also listed in ${c.all.slice(1).map(a => `${semLabel(a.sem)} <span class="muted">(${esc(trimList(a.from))})</span>`).join(", ")}</li>`).join("")}</ul></div>`;
+    html += `<div class="rsec"><h3>Listed twice in one program · earliest kept</h3><ul>${result.conflicts.map(c =>
+      `<li>${esc(c.code)}${c.program ? ` <span class="muted">in ${esc(shortProg(c.program))}</span>` : ""} → <b>${semLabel(c.kept)}</b>; also listed in ${c.all.slice(1).map(a => semLabel(a.sem)).join(", ")}</li>`).join("")}</ul></div>`;
   }
   if (result.fixes.length) {
     html += `<div class="rsec"><h3>Corrected codes</h3><ul>${result.fixes.map(([a, b]) => `<li>${esc(a)} → ${esc(b)} <span class="muted">(missing suffix in the source)</span></li>`).join("")}</ul></div>`;
@@ -392,11 +414,6 @@ function showReport(reports, result, title) {
   $("#btnUndoImport").hidden = !lastUndo;
   openDialog("#reportDlg");
 }
-function trimList(arr) {
-  const a = arr.map(shortProg);
-  return a.length > 2 ? `${a.slice(0, 2).join("; ")} +${a.length - 2} more` : a.join("; ");
-}
-
 async function importFiles(fileList) {
   const files = [...fileList].filter(Boolean);
   if (!files.length) return;
@@ -419,7 +436,7 @@ async function importFiles(fileList) {
   hideToast();
   if (!batches.some(b => b.records.length)) {
     lastUndo = null;
-    showReport(reports, { added: 0, total: state.courses.size, conflicts: [], fixes: [], missing: new Map() }, "Nothing imported");
+    showReport(reports, { added: 0, total: state.courses.size, conflicts: [], varied: 0, fixes: [], missing: new Map() }, "Nothing imported");
     render();
     return;
   }
@@ -445,11 +462,18 @@ let cardEls = new Map(), edgeEls = [];
 let zoom = 1;
 const Z = { min: 0.12, max: 3 };
 
+// the program whose semesters apply ("" for all programs, or courses added by hand)
+const viewProgram = () => (state.filter && state.filter !== MANUAL ? state.filter : "");
+// the semester a course is taken in, in the program in view
+const semOf = c => PF.semIn(c, viewProgram());
+// whether the programs listing a course take it in different semesters
+const timingVaries = c => new Set(c.programs.map(p => PF.semIn(c, p))).size > 1;
 function visibleCourses() {
   const all = [...state.courses.values()];
   if (!state.filter) return all;
   if (state.filter === MANUAL) return all.filter(c => !c.programs.length);
-  return all.filter(c => c.programs.includes(state.filter));
+  // each course sits in this program's own semester
+  return all.filter(c => c.programs.includes(state.filter)).map(c => { const s = semOf(c); return s === c.semester ? c : { ...c, semester: s }; });
 }
 
 // requirements written as notes (see plan.js) that the layout draws: Capstone's years 1–3
@@ -1050,7 +1074,7 @@ function planItem(code, P) {
   const st = P.status.get(code);
   const off = !view || !view.nodes.has(code);
   const cr = st && st.state === "locked" && st.creditsShort ? ` · ${st.minCredits} cr` : "";
-  return `<button type="button" class="pitem ${st ? st.state : ""}" data-goto="${esc(code)}" title="${esc(statusText(code))}${off ? " · not in the shown program" : ""}"><b>${esc(code)}</b><span>${esc(c.name)}</span><i>${semLabel(c.semester)}${cr}${P.path && P.path.goals.includes(code) ? " · ◎" : ""}</i></button>`;
+  return `<button type="button" class="pitem ${st ? st.state : ""}" data-goto="${esc(code)}" title="${esc(statusText(code))}${off ? " · not in the shown program" : ""}"><b>${esc(code)}</b><span>${esc(c.name)}</span><i>${semLabel(semOf(c))}${cr}${P.path && P.path.goals.includes(code) ? " · ◎" : ""}</i></button>`;
 }
 // the drawer's contents in plan mode when no course is pinned
 function planPanelHtml() {
@@ -1088,7 +1112,7 @@ function planPanelHtml() {
     }
   }
   // available now, in this view
-  const ready = vis.filter(c => P.status.get(c.code).state === "ready").sort((a, b) => a.semester - b.semester || cmpCode(a.code, b.code));
+  const ready = vis.filter(c => P.status.get(c.code).state === "ready").sort((a, b) => semOf(a) - semOf(b) || cmpCode(a.code, b.code));
   h += `<h3>Available now</h3>`;
   h += ready.length ? `<div class="plist">${ready.map(c => planItem(c.code, P)).join("")}</div>` : `<p class="plain muted">${vis.length && doneShown === vis.length ? "Every shown course is completed." : "Nothing shown is available yet."}</p>`;
   h += `</div><footer><button class="btn sd-btn sd-small" type="button" id="pClearGoals"${plan.goals.length ? "" : " disabled"}>Clear goals</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="pClearDone"${plan.completed.size ? "" : " disabled"}>Clear completed</button></footer>`;
@@ -1109,7 +1133,7 @@ function planDetailsHtml(c) {
 function chip(code, cls = "") {
   const c = state.courses.get(code);
   if (!c) return `<span class="chip missing" title="Not in the loaded courses">${esc(code)}</span>`;
-  return `<button type="button" class="chip ${cls}" data-goto="${esc(code)}" title="${esc(c.name)} · ${semLabel(c.semester)}">${esc(code)}</button>`;
+  return `<button type="button" class="chip ${cls}" data-goto="${esc(code)}" title="${esc(c.name)} · ${semLabel(semOf(c))}">${esc(code)}</button>`;
 }
 function groupsHtml(groups, cls, lead) {
   return groups.map(g => `<div class="grp">${g.length > 1 ? `<span class="lead">${lead || "one of"}</span>${g.map(x => chip(x, cls)).join(`<span class="or">or</span>`)}` : chip(g[0], cls)}</div>`).join("");
@@ -1137,11 +1161,11 @@ function renderDetails() {
   d.dataset.kind = "course";
   // Capstone's years 1–3 requirement counts as a prerequisite of the courses it covers
   const lim = course => PFPlan.rules(course).yearsComplete * 2;
-  const shownCap = view ? view.visible.filter(o => lim(o) && o.code !== c.code && !lim(c) && c.semester <= lim(o) && view.nodes.has(c.code)) : [];
+  const shownCap = view ? view.visible.filter(o => lim(o) && o.code !== c.code && !lim(c) && semOf(c) <= lim(o) && view.nodes.has(c.code)) : [];
   const unlocks = [...new Set([...[...state.courses.values()].filter(o => [...o.prereqs, ...o.coreqs].some(g => g.includes(c.code))).map(o => o.code), ...shownCap.map(o => o.code)])].sort(cmpCode);
   const hl = state.highlights.find(h => h.code === c.code);
   let html = `<header><span class="dcode">${esc(c.code)}</span><span class="hbtns">${plan.on ? `<button class="btn ghost sd-btn sd-small sd-ghost" type="button" id="dBack" title="Back to the plan panel">← plan</button>` : ""}<button class="xbtn sd-x" type="button" id="dClose" aria-label="Close details">×</button></span>
-    <div class="dname">${esc(c.name)}</div><div class="dsem">${semLong(c.semester)}</div></header><div class="dbody">`;
+    <div class="dname">${esc(c.name)}</div><div class="dsem">${!viewProgram() && timingVaries(c) ? "Semester varies by program" : semLong(semOf(c))}</div></header><div class="dbody">`;
   if (plan.on) html += planDetailsHtml(c);
   html += `<h3>Highlight tree</h3><div class="hlrow"><div class="seg sd-seg" role="group" aria-label="Highlight tree">${Object.entries(DIRS).map(([k, v]) =>
     `<button type="button" data-hl="${k}" aria-pressed="${!!hl && hl.dir === k}">${v}</button>`).join("")}</div><button type="button" class="btn sd-btn sd-small" id="dZoom">Zoom to chain</button></div>`;
@@ -1155,7 +1179,9 @@ function renderDetails() {
   html += `<h3>Required by</h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
   if (c.notes.length) html += `<h3>Notes</h3>${c.notes.map(n => `<p class="plain">${esc(n)}</p>`).join("")}`;
   if (c.ignored.length) html += `<h3>Ignored from the source</h3>${c.ignored.map(n => `<p class="plain muted">${esc(n)}</p>`).join("")}`;
-  if (c.programs.length) html += `<h3>Listed in</h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}</li>`).join("")}</ul>`;
+  // each program's own semester, when they differ (otherwise the header says it)
+  const varies = timingVaries(c);
+  if (c.programs.length) html += `<h3>${varies ? "Taken in" : "Listed in"}</h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}${varies ? ` <span class="muted">· ${semLabel(PF.semIn(c, p))}</span>` : ""}</li>`).join("")}</ul>`;
   html += `</div><footer><button class="btn sd-btn sd-small" type="button" id="dEdit">Edit</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="dDelete">Delete</button></footer>`;
   d.innerHTML = html;
   d.hidden = false;
@@ -1423,13 +1449,16 @@ let editing = null;
 function openEdit(code) {
   editing = code && state.courses.get(code) ? code : null;
   const c = editing ? state.courses.get(editing) : null;
-  const n = Math.max(state.semCount, ...[...state.courses.values()].map(x => x.semester), c ? c.semester : 1);
+  const n = Math.max(state.semCount, ...[...state.courses.values()].map(semOf), c ? semOf(c) : 1);
+  // in a program view, the semester is that program's own (other programs keep theirs)
+  const prog = editProgram(c);
+  $("#fSemLabel").textContent = prog ? `Semester in ${shortProg(prog)}` : c && timingVaries(c) ? "Semester in every program" : "Semester";
   $("#fSem").innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i + 1}">${semLong(i + 1)}</option>`).join("");
   $("#editTitle").textContent = c ? `Edit ${c.code}` : "Add course";
   $("#fCode").value = c ? c.code : "";
   $("#fCode").readOnly = !!c;
   $("#fName").value = c ? c.name : "";
-  $("#fSem").value = String(c ? c.semester : 1);
+  $("#fSem").value = String(c ? semOf(c) : 1);
   const fmt = gs => gs.map(g => g.join(" or ")).join(", ");
   $("#fPre").value = c ? fmt(c.prereqs) : "";
   $("#fCo").value = c ? fmt(c.coreqs) : "";
@@ -1438,6 +1467,11 @@ function openEdit(code) {
   disarm($("#fDelete"), "Delete course");
   openDialog("#editDlg");
   setTimeout(() => (c ? $("#fName") : $("#fCode")).focus(), 0);
+}
+// the program whose semester the edit form changes: the one in view, if the course is in it
+function editProgram(c) {
+  const p = viewProgram();
+  return p && (!c || c.programs.includes(p)) ? p : "";
 }
 function saveEdit() {
   const rawCode = $("#fCode").value.trim();
@@ -1450,13 +1484,21 @@ function saveEdit() {
   const pre = PF.parseRequirementText($("#fPre").value), co = PF.parseRequirementText($("#fCo").value);
   const strip = gs => gs.map(g => g.filter(x => x !== code)).filter(g => g.length);
   const old = editing ? state.courses.get(editing) : null;
+  // In a program view only that program's semester changes. Otherwise the course moves
+  // to the chosen semester in every program it's listed in.
+  const sem = clampSem($("#fSem").value), prog = editProgram(old);
+  const semesters = old ? PF.programSemesters(old) : {};
+  for (const p of Object.keys(semesters)) if (!prog || p === prog) semesters[p] = sem;
+  if (prog) semesters[prog] = sem;
   const course = {
-    code, name, semester: clampSem($("#fSem").value),
+    code, name,
+    semester: prog ? Math.min(...Object.values(semesters)) : sem,
+    semesters,
     prereqs: strip(PF.dedupeGroups(pre.prereqs)),
     coreqs: strip(PF.dedupeGroups([...pre.coreqs, ...co.prereqs, ...co.coreqs])),
     notes: old ? old.notes : [...pre.notes, ...co.notes],
     ignored: old ? old.ignored : [...pre.ignored, ...co.ignored],
-    programs: old ? old.programs : [],
+    programs: old ? old.programs : prog ? [prog] : [],
   };
   const undo = snapshot();
   state.courses.set(code, course);
@@ -1507,6 +1549,13 @@ function fileBase(onlyFilter) {
   const tag = onlyFilter && state.filter && state.filter !== MANUAL ? "-" + slug(shortProg(state.filter)) : "";
   return `prereqflow${tag}-${today()}`;
 }
+// a course's per-program semesters for an export: only when some program differs from
+// its main semester, and only for the programs it's listed in
+function exportSemesters(c) {
+  const s = PF.programSemesters(c);
+  const keys = c.programs.filter(p => s[p]);
+  return keys.some(p => s[p] !== c.semester) ? Object.fromEntries(keys.map(p => [p, s[p]])) : null;
+}
 function buildExport(kind, onlyFilter) {
   const list = exportList(onlyFilter);
   const base = fileBase(onlyFilter);
@@ -1515,7 +1564,10 @@ function buildExport(kind, onlyFilter) {
     const data = {
       format: "prereqflow", version: 1, exportedAt: new Date().toISOString(), semesters: state.semCount,
       programs: state.programs.filter(p => programs.includes(p)),
-      courses: list.map(c => ({ code: c.code, name: c.name, semester: c.semester, term: PF.semesterLabel(c.semester), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs })),
+      courses: list.map(c => {
+        const sems = exportSemesters(c);
+        return { code: c.code, name: c.name, semester: c.semester, term: PF.semesterLabel(c.semester), ...(sems ? { semesters: sems } : {}), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs };
+      }),
     };
     if (plan.completed.size || plan.goals.length) data.plan = { completed: [...plan.completed].sort(cmpCode), goals: plan.goals.slice() };
     return { filename: base + ".json", data: JSON.stringify(data, null, 2) + "\n", mime: "application/json" };
@@ -1523,8 +1575,12 @@ function buildExport(kind, onlyFilter) {
   if (kind === "csv") {
     const q = v => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
     const fmt = gs => gs.map(g => g.join(" or ")).join(", ");
-    const lines = [["Code", "Name", "Semester", "Year-Semester", "Prerequisites", "Corequisites", "Notes", "Ignored", "Programs"].join(",")];
-    for (const c of list) lines.push([c.code, c.name, String(c.semester), PF.semesterLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; ")].map(q).join(","));
+    const lines = [["Code", "Name", "Semester", "Year-Semester", "Prerequisites", "Corequisites", "Notes", "Ignored", "Programs", "Program semesters"].join(",")];
+    for (const c of list) {
+      const sems = exportSemesters(c);
+      const ps = sems ? Object.entries(sems).map(([p, n]) => `${p} = ${PF.semesterLabel(n)}`).join("; ") : "";
+      lines.push([c.code, c.name, String(c.semester), PF.semesterLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; "), ps].map(q).join(","));
+    }
     return { filename: base + ".csv", data: "﻿" + lines.join("\r\n") + "\r\n", mime: "text/csv" };
   }
   const out = ["# PrereqFlow export", "# One course per line: CODE Name (prerequisites, Coreq: …). A line like Year 2 Sem 1 sets the semester for the lines below it.", ""];
@@ -2086,7 +2142,7 @@ $("#search").addEventListener("input", e => { state.query = e.target.value; appl
 $("#search").addEventListener("keydown", e => {
   if (e.key === "Enter" && view) {
     const q = state.query.trim();
-    const hit = q && view.visible.filter(c => matchesQuery(c, q)).sort((a, b) => a.semester - b.semester || cmpCode(a.code, b.code))[0];
+    const hit = q && view.visible.filter(c => matchesQuery(c, q)).sort((a, b) => semOf(a) - semOf(b) || cmpCode(a.code, b.code))[0];
     if (hit) select(hit.code, { scroll: true });
   } else if (e.key === "Escape") { e.target.value = ""; state.query = ""; applyHighlight(); }
 });

@@ -22,6 +22,8 @@ const PFPlan = (() => {
   const CREDIT_RE = /\b(\d{2,3})\s*(?:credit[\s-]*hours?|credits?)\b/i;
   const YEARS_RE = /\ball\b[^.;]*?\bcourses\b[^.;]*?\byears?\s+(?:one|1)\s*(?:through|to|thru|-|–)\s*(one|two|three|four|five|[1-5])\b/i;
   const cmpCode = (a, b) => a.localeCompare(b, "en", { numeric: true });
+  // the semester a course is taken in, in a given program (see PF.semIn in parser.js)
+  const semIn = (c, program) => (program && c.semesters && c.semesters[program]) || c.semester;
 
   // → { minCredits, yearsComplete } from a course's notes (0 when absent)
   function rules(c) {
@@ -53,7 +55,7 @@ const PFPlan = (() => {
     for (const p of pools) {
       const list = [];
       for (const o of courses.values()) {
-        if (o.code === c.code || o.semester > lim || rules(o).yearsComplete) continue;
+        if (o.code === c.code || semIn(o, p) > lim || rules(o).yearsComplete) continue;
         if (p && !(o.programs || []).includes(p)) continue;
         list.push(o.code);
       }
@@ -139,7 +141,7 @@ const PFPlan = (() => {
       const own = owner.programs || [];
       const rank = x => {
         const progs = courses.get(x).programs || [];
-        return [program && progs.includes(program) ? 0 : 1, -own.filter(p => progs.includes(p)).length, needed.has(x) ? 0 : 1, cost(x), courses.get(x).semester];
+        return [program && progs.includes(program) ? 0 : 1, -own.filter(p => progs.includes(p)).length, needed.has(x) ? 0 : 1, cost(x), semIn(courses.get(x), program)];
       };
       const byRank = ([a, x], [b, y]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return cmpCode(x, y); };
       return opts.map(x => [rank(x), x]).sort(byRank)[0][1];
@@ -218,11 +220,11 @@ const PFPlan = (() => {
     const renum = new Map(used.map((v, i) => [v, i + 1]));
     const steps = used.map(() => []);
     for (const x of needed) { const k = renum.get(step.get(x)); step.set(x, k); steps[k - 1].push(x); }
-    for (const s of steps) s.sort((a, b) => courses.get(a).semester - courses.get(b).semester || cmpCode(a, b));
+    for (const s of steps) s.sort((a, b) => semIn(courses.get(a), program) - semIn(courses.get(b), program) || cmpCode(a, b));
     const usedPools = new Map([...pools].filter(([code]) => needed.has(code)));
     return { steps, step, needed, goals: goalList, doneGoals: goalList.filter(done), short, pools: usedPools, picks };
   }
 
-  return { CREDITS, rules, evaluate, plan, yearsPool };
+  return { CREDITS, rules, evaluate, plan, yearsPool, semIn };
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = PFPlan;

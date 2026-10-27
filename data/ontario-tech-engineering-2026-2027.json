@@ -415,6 +415,19 @@
       "name": "Electric Circuits",
       "semester": 3,
       "term": "2-1",
+      "semesters": {
+        "Automotive Engineering 2026-2027": 3,
+        "Nuclear Engineering 2026-2027": 3,
+        "Mechanical Engineering: Railway Specialization 2026-2027": 4,
+        "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027": 4,
+        "Mechanical Engineering: Aerospace Specialization 2026-2027": 4,
+        "Mechanical Engineering 2026-2027": 4,
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 4,
+        "Manufacturing Engineering 2026-2027": 4,
+        "Industrial Engineering 2026-2027": 4,
+        "Energy Engineering 2026-2027": 4,
+        "Automotive Engineering: Railway Specialization 2026-2027": 3
+      },
       "prereqs": [
         [
           "MATH 1020U"
@@ -664,6 +677,15 @@
       "name": "Thermodynamics and Heat Transfer",
       "semester": 3,
       "term": "2-1",
+      "semesters": {
+        "Automotive Engineering 2026-2027": 3,
+        "Mechatronics Engineering 2026-2027": 5,
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 3,
+        "Manufacturing Engineering 2026-2027": 3,
+        "Electrical Engineering: Smart Grid Specialization 2026-2027": 3,
+        "Electrical Engineering 2026-2027": 3,
+        "Automotive Engineering: Railway Specialization 2026-2027": 3
+      },
       "prereqs": [
         [
           "MATH 1020U"
@@ -1018,6 +1040,17 @@
       "name": "Fluid Mechanics",
       "semester": 4,
       "term": "2-2",
+      "semesters": {
+        "Automotive Engineering 2026-2027": 4,
+        "Mechatronics Engineering 2026-2027": 6,
+        "Mechanical Engineering: Railway Specialization 2026-2027": 4,
+        "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027": 4,
+        "Mechanical Engineering: Aerospace Specialization 2026-2027": 4,
+        "Mechanical Engineering 2026-2027": 4,
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 4,
+        "Manufacturing Engineering 2026-2027": 4,
+        "Automotive Engineering: Railway Specialization 2026-2027": 4
+      },
       "prereqs": [
         [
           "PHY 1010U"
@@ -1786,6 +1819,10 @@
       "name": "Heat Transfer",
       "semester": 5,
       "term": "3-1",
+      "semesters": {
+        "Nuclear Engineering 2026-2027": 5,
+        "Energy Engineering 2026-2027": 6
+      },
       "prereqs": [
         [
           "NUCL 2010U"
@@ -2216,6 +2253,11 @@
       "name": "Quality Control",
       "semester": 6,
       "term": "3-2",
+      "semesters": {
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 8,
+        "Manufacturing Engineering 2026-2027": 8,
+        "Industrial Engineering 2026-2027": 6
+      },
       "prereqs": [
         [
           "STAT 2800U"
@@ -2464,6 +2506,12 @@
       "name": "Industrial Automation",
       "semester": 6,
       "term": "3-2",
+      "semesters": {
+        "Mechatronics Engineering 2026-2027": 8,
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 6,
+        "Manufacturing Engineering 2026-2027": 6,
+        "Industrial Engineering 2026-2027": 6
+      },
       "prereqs": [],
       "coreqs": [],
       "notes": [],
@@ -2819,6 +2867,24 @@
       "name": "Ethics, Law and Professionalism for Engineers",
       "semester": 7,
       "term": "4-1",
+      "semesters": {
+        "Automotive Engineering 2026-2027": 8,
+        "Software Engineering: IoT Specialization 2026-2027": 8,
+        "Software Engineering 2026-2027": 8,
+        "Nuclear Engineering 2026-2027": 8,
+        "Mechatronics Engineering 2026-2027": 8,
+        "Mechanical Engineering: Railway Specialization 2026-2027": 7,
+        "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027": 7,
+        "Mechanical Engineering: Aerospace Specialization 2026-2027": 7,
+        "Mechanical Engineering 2026-2027": 7,
+        "Manufacturing Engineering: Railway Specialization 2026-2027": 8,
+        "Manufacturing Engineering 2026-2027": 8,
+        "Industrial Engineering 2026-2027": 7,
+        "Energy Engineering 2026-2027": 7,
+        "Electrical Engineering: Smart Grid Specialization 2026-2027": 8,
+        "Electrical Engineering 2026-2027": 8,
+        "Automotive Engineering: Railway Specialization 2026-2027": 8
+      },
       "prereqs": [],
       "coreqs": [],
       "notes": [
