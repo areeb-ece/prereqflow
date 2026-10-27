@@ -98,3 +98,14 @@ test("built-in data: the .js wrapper matches the .json", () => {
   assert.deepEqual(global.window.PREREQFLOW_DEFAULT, data);
   delete global.window;
 });
+
+test("built-in data: per-program semesters cover only listed programs and are valid", () => {
+  for (const c of data.courses) {
+    if (!c.semesters) continue;
+    for (const [p, n] of Object.entries(c.semesters)) {
+      assert.ok(c.programs.includes(p), `${c.code}: ${p} isn't a listed program`);
+      assert.ok(Number.isInteger(n) && n >= 1 && n <= 16, `${c.code}: bad semester ${n}`);
+    }
+    assert.equal(c.semester, Math.min(...Object.values(c.semesters)), `${c.code}: fallback should be the earliest`);
+  }
+});

@@ -40,12 +40,36 @@ test("text export round-trips through the line parser", () => {
   assert.equal(back.name, c.name);
 });
 
-test("merging keeps the earliest semester and the fuller either/or group", () => {
+test("merging keeps each program's own semester and the fuller either/or group", () => {
   const map = new Map();
   PF.mergeInto(map, [{ code: "MANE 2220U", name: "Materials", semester: 4, prereqs: [["CHEM 1800U"]], coreqs: [], programs: ["A"] }]);
   PF.mergeInto(map, [{ code: "MANE 2220U", name: "Materials", semester: 3, prereqs: [["CHEM 1020U", "CHEM 1800U"]], coreqs: [], programs: ["B"] }]);
   const c = map.get("MANE 2220U");
-  assert.equal(c.semester, 3);
+  assert.equal(c.semester, 3, "the fallback (all-programs view) is the earliest");
+  assert.deepEqual(c.semesters, { A: 4, B: 3 });
+  assert.equal(PF.semIn(c, "A"), 4);
+  assert.equal(PF.semIn(c, "B"), 3);
   assert.deepEqual(c.prereqs, [["CHEM 1020U", "CHEM 1800U"]]);
   assert.deepEqual(c.programs, ["A", "B"]);
+});
+
+test("course level never decides a program's semester: a 2000-level course can be in year 3", () => {
+  const map = new Map();
+  const p = PF.parseCourseText("MECE 2640U Thermodynamics and Heat Transfer (MATH 1020U, PHY 1010U)");
+  PF.mergeInto(map, [PF.mkCourse(p, 3, "Automotive")]);
+  PF.mergeInto(map, [PF.mkCourse(p, 5, "Mechatronics")]);
+  const c = map.get("MECE 2640U");
+  assert.equal(PF.semIn(c, "Automotive"), 3);
+  assert.equal(PF.semIn(c, "Mechatronics"), 5);
+});
+
+test("a program listing a course twice keeps its earliest; an earlier program elsewhere moves no one else", () => {
+  const map = new Map();
+  // old-format record: one semester for every program it lists
+  PF.mergeInto(map, [{ code: "STAT 2800U", name: "Stats", semester: 4, prereqs: [], coreqs: [], programs: ["A", "B"] }]);
+  PF.mergeInto(map, [PF.mkCourse({ code: "STAT 2800U", name: "Stats" }, 3, "C")]);
+  PF.mergeInto(map, [PF.mkCourse({ code: "STAT 2800U", name: "Stats" }, 6, "A")]);
+  const c = map.get("STAT 2800U");
+  assert.deepEqual(c.semesters, { A: 4, B: 4, C: 3 });
+  assert.equal(c.semester, 3);
 });

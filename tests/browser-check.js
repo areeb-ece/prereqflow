@@ -175,6 +175,44 @@ async function check(name, fn) {
         assert.equal(await cardCount(), 158);
       });
 
+      await check("each program shows a course in its own semester", async () => {
+        // MECE 2640U: Year 2 Sem 1 in Automotive, Year 3 Sem 1 in Mechatronics
+        const left = code => page.$eval(`.card[data-code="${code}"]`, e => e.style.left);
+        const pick = async re => {
+          const opt = await page.$$eval("#programFilter option", (o, src) => o.map(x => [x.value, x.textContent]).find(x => new RegExp(src).test(x[1])), re);
+          await page.selectOption(await tool("#programFilter"), opt[0]);
+          await wait(500);
+        };
+        await pick("^Mechatronics");
+        assert.equal(await left("MECE 2640U"), await left("METE 3300U"), "with the year 3 semester 1 courses");
+        await pick("^Automotive Engineering(?!:)");
+        assert.equal(await left("MECE 2640U"), await left("MANE 2220U"), "with the year 2 semester 1 courses");
+        // editing the semester in one program's view leaves the other programs alone
+        await pick("^Mechatronics");
+        await clickCard("MECE 2640U", null, "dblclick");
+        await wait(300);
+        assert.match(await page.textContent("#fSemLabel"), /Semester in Mechatronics Engineering/);
+        assert.equal(await page.inputValue("#fSem"), "5");
+        await page.selectOption("#fSem", "6");
+        await page.click("#fSave");
+        await wait(500);
+        assert.equal(await left("MECE 2640U"), await left("METE 3100U"), "moved to year 3 semester 2 in Mechatronics");
+        await pick("^Automotive Engineering(?!:)");
+        assert.equal(await left("MECE 2640U"), await left("MANE 2220U"), "Automotive unchanged");
+        await toastAct(); // Undo the edit
+        await pick("^Mechatronics");
+        assert.equal(await left("MECE 2640U"), await left("METE 3300U"), "Undo restores year 3 semester 1");
+        await page.selectOption(await tool("#programFilter"), "");
+        await wait(500);
+        await clickCard("MECE 2640U");
+        await wait(500);
+        assert.match(await page.textContent("#details .dsem"), /varies by program/);
+        assert.match(await page.textContent("#details"), /Mechatronics Engineering · Year 3 Sem 1/);
+        await clickCard("MECE 2640U");
+        await wait(300);
+        if (await sheetOpen()) await page.click("#btnMenu");
+      });
+
       await check("layouts and semester count", async () => {
         await tap('#modeSeg [data-mode="free"]');
         await wait(800);

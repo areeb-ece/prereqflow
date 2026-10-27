@@ -81,7 +81,7 @@ MECE 2430U Dynamics (MECE 2230U, MATH 2860U or MATH 2050U)
 | `Coreq: C` | corequisite, drawn like a prerequisite |
 | `Credit restrictions: …`, `Exclusions: …` | kept as a note, not drawn |
 | `2-1`, `Year 2 Semester 1`, `S3` | sets the semester for the lines below it |
-| no semester given | placed by course level (2000-level → 2-1) |
+| no semester given | a first guess from the course level (2000-level → 2-1), flagged in the import summary; move it with Edit |
 
 You can paste many lines at once, including text that wraps across lines when copied
 out of a PDF. Each course ends up on its own row and is checked as you type.
@@ -253,9 +253,19 @@ boolean grammar in which `or` binds tighter than `,` / `and`, and the result is
 converted to **CNF**: a list of groups that are all required, where each group is a
 set of alternatives. Program-map PDFs are rebuilt from pdf.js text items by
 clustering lines into table cells and matching each cell to its semester row label.
-When the same course appears in several programs, the records are merged. The
-earliest semester is kept, and when one map lists only a subset of alternatives,
-the fuller either/or group wins.
+When the same course appears in several programs, the records are merged. Each
+program keeps its own semester for the course (Thermodynamics and Heat Transfer is
+Year 2 Sem 1 in Automotive but Year 3 Sem 1 in Mechatronics), and when one map lists
+only a subset of alternatives, the fuller either/or group wins.
+
+### Semesters per program
+
+A course's `semester` is where it sits with all programs shown: the earliest of its
+programs. `semesters` (when present) maps each program to its own semester, and a
+program view, the planner's "years one through three" rule and the course panel all
+use that program's value. JSON exports carry `semesters`; CSV exports carry a
+`Program semesters` column (`Program = 3-1; …`); both import back. Editing a course's
+semester inside a program view changes only that program.
 
 ### Layout (`js/layout.js`)
 
@@ -366,11 +376,25 @@ default, no `/design/`, so it tests the offline fallback;
 shared design system, and `BROWSER=firefox` runs it in Firefox. Screenshots go to
 `test-results/screenshots/`.
 
-To update the built-in programs: set `PDF_IMPORT = true` in `js/app.js` (the PDF
-reader is kept but switched off), load the new program-map PDFs in the app, export
-JSON, replace `data/ontario-tech-engineering-2026-2027.json` and run
-`npm run build:data`. Then add back the credit-hour notes on ENGR 3360U and ENGR 4760U
-if the maps still leave them out, and switch `PDF_IMPORT` off again.
+To set every program's own semesters from the official program maps, put the 16 PDFs
+in one folder and run:
+
+```sh
+npm i --no-save pdfjs-dist@4.10.38
+node scripts/apply-program-maps.js path/to/maps --dry-run   # see what would change
+node scripts/apply-program-maps.js path/to/maps
+npm run build:data
+```
+
+It changes only the per-program semesters, and lists every change plus anything that
+doesn't line up between the maps and the data.
+
+To rebuild the built-in programs from scratch (new courses or requirements): set
+`PDF_IMPORT = true` in `js/app.js` (the PDF reader is kept but switched off), load the
+new program-map PDFs in the app, export JSON, replace
+`data/ontario-tech-engineering-2026-2027.json` and run `npm run build:data`. Then add
+back the credit-hour notes on ENGR 3360U and ENGR 4760U if the maps still leave them
+out, and switch `PDF_IMPORT` off again.
 
 ## Credits
 
