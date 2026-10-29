@@ -64,6 +64,7 @@
       <span class="sd-select sd-small"><select id="semCount" aria-label="Number of semesters">
         <option value="4">4 semesters</option><option value="6">6 semesters</option><option value="8" selected>8 semesters</option><option value="10">10 semesters</option><option value="12">12 semesters</option>
       </select></span>
+      <button class="btn sd-btn sd-small" id="btnElectives" type="button" title="Choose this program's engineering electives" hidden>Electives</button>
     </div>
 
     <div class="legend" aria-label="Legend">
@@ -146,6 +147,7 @@
     <dt>Click or tap</dt><dd>Pin it and open its details (in Plan, the bar sets what a click does)</dd>
     <dt><kbd class="sd-kbd">Shift</kbd> + click</dt><dd>Highlight its prerequisite tree</dd>
     <dt>Double-click</dt><dd>Edit the course</dd>
+    <dt>Click an engineering elective slot</dt><dd>Choose a course for it from the program's electives list</dd>
     <dt>Scroll or pinch</dt><dd>Zoom around the pointer</dd>
     <dt>Drag, or <kbd class="sd-kbd">Shift</kbd> + scroll</dt><dd>Move around the sheet</dd>
     <dt><kbd class="sd-kbd">Shift</kbd> + drag</dt><dd>Draw a box to zoom into</dd>
@@ -191,7 +193,7 @@
       <section class="opt" aria-labelledby="wBuiltIn">
         <h3 id="wBuiltIn">Ontario Tech Engineering</h3>
         <p class="sub">16 program maps · 2026–2027</p>
-        <p id="wDefaultInfo">All engineering programs and specializations, parsed from the official program maps.</p>
+        <p id="wDefaultInfo">All engineering programs and specializations, parsed from the official program maps, with each program's engineering electives to choose from.</p>
         <label class="sd-field"><span class="sd-label">Start with</span><span class="sd-select"><select id="wProgram"></select></span></label>
         <div class="row"><button class="btn primary sd-btn sd-primary" type="button" id="wDefault">Open program maps</button></div>
       </section>
@@ -295,6 +297,18 @@
   </div>
 </div>
 
+<!-- Engineering electives -->
+<div class="overlay" id="electiveDlg" hidden>
+  <div class="dialog wide sd-dialog" role="dialog" aria-modal="true" aria-labelledby="electiveTitle">
+    <header><h2 id="electiveTitle">Engineering electives</h2><button class="xbtn sd-x" type="button" data-close aria-label="Close">×</button></header>
+    <div class="dbody" id="electiveBody"></div>
+    <footer>
+      <span class="spacer"></span>
+      <button class="btn primary sd-btn sd-primary" type="button" data-close>Done</button>
+    </footer>
+  </div>
+</div>
+
 <!-- Image export -->
 <div class="overlay" id="imageDlg" hidden>
   <div class="dialog sd-dialog" role="dialog" aria-modal="true" aria-labelledby="imageTitle">
@@ -368,6 +382,7 @@
 <script src="js/parser.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/plan.js"></script>
+<script src="js/electives.js"></script>
 <script src="js/image.js"></script>
 <script src="js/app.js"></script>
 <script src="js/chrome.js"></script>

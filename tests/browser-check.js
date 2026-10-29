@@ -213,6 +213,97 @@ async function check(name, fn) {
         if (await sheetOpen()) await page.click("#btnMenu");
       });
 
+      await check("engineering electives: slots, picker, sheet, plan, drawer, export and Undo", async () => {
+        const pick = async re => {
+          const opt = await page.$$eval("#programFilter option", (o, src) => o.map(x => [x.value, x.textContent]).find(x => new RegExp(src).test(x[1])), re);
+          await page.selectOption(await tool("#programFilter"), opt[0]);
+          await wait(500);
+        };
+        const slots = () => page.$$eval("#cards .slot", s => s.map(x => x.dataset.slot).join(","));
+        const clickSlot = sem => page.$eval(`#cards .slot[data-slot="${sem}"]`, e => e.click());
+        const tick = (code, sem) => page.$eval(`#electiveBody [data-el="${code}"][data-sem="${sem}"]`, e => e.click()).then(() => wait(250));
+        const left = code => page.$eval(`.card[data-code="${code}"]`, e => e.style.left);
+        // Mechatronics leaves two electives in Year 4 Sem 1 and one in Year 4 Sem 2
+        await pick("^Mechatronics");
+        assert.equal(await slots(), "7,7,8");
+        await pick("^Mechanical Engineering: Railway");
+        assert.equal(await slots(), "", "Railway has no engineering electives");
+        assert.ok(await page.isHidden("#btnElectives"));
+        await pick("^Mechatronics");
+        assert.ok(!(await page.isHidden("#btnElectives")));
+        await clickSlot(8);
+        await wait(300);
+        assert.ok(await visible("#electiveDlg"));
+        const body = await page.textContent("#electiveBody");
+        assert.match(body, /Year 4 Sem 1/);
+        assert.match(body, /Year 4 Sem 2/);
+        assert.doesNotMatch(body, /SOFE 4630U/, "another program's elective isn't offered");
+        assert.doesNotMatch(body, /METE 4280U/, "a course the program requires isn't offered");
+        assert.equal(await page.$('#electiveBody [data-el="ENGR 3150U"][data-sem="8"]'), null, "a fall course isn't offered in winter");
+        assert.match(await page.textContent('#electiveBody label:has([data-el="INSE 4248U"])'), /special permission.*ENGR 3150U/);
+        await tick("ENGR 3150U", 7);
+        await tick("INSE 4248U", 8);
+        assert.doesNotMatch(await page.textContent('#electiveBody label:has([data-el="INSE 4248U"])'), /ENGR 3150U/, "met by the Year 4 Sem 1 elective");
+        // a single-slot semester swaps its elective
+        await tick("MANE 3460U", 8);
+        assert.deepEqual(await page.$$eval('#electiveBody [data-sem="8"]:checked', e => e.map(x => x.dataset.el)), ["MANE 3460U"]);
+        await tick("INSE 4248U", 8);
+        await page.click("#electiveDlg footer [data-close]");
+        await wait(500);
+        assert.equal(await slots(), "7");
+        assert.equal(await left("ENGR 3150U"), await left("METE 4280U"), "in Year 4 Sem 1, as the map places it");
+        assert.equal(await left("INSE 4248U"), await left("METE 4200U"), "in Year 4 Sem 2");
+        assert.equal(await page.textContent('.card[data-code="ENGR 3150U"] .rq'), "elective");
+        assert.equal(await page.$$eval('.card[data-code="MANE 3460U"]', e => e.length), 0, "the swapped-out course left the program");
+        // plan: a slot click still opens the picker; an elective is a goal like any course
+        await tap('#planSeg [data-plan="1"]');
+        await wait(300);
+        await clickSlot(7);
+        await wait(300);
+        assert.ok(await visible("#electiveDlg"));
+        await page.keyboard.press("Escape");
+        await wait(200);
+        await tap('#brushSeg [data-brush="goal"]');
+        await clickCard("INSE 4248U");
+        await wait(500);
+        const panel = await page.textContent("#details");
+        assert.match(panel, /Path, in order/);
+        for (const x of ["ENGR 3150U", "STAT 2800U", "INSE 4248U"]) assert.ok(panel.includes(x), `${x} on the goal path`);
+        await clickCard("INSE 4248U"); // goal off again
+        await wait(300);
+        await tap('#brushSeg [data-brush="done"]');
+        await tap('#planSeg [data-plan="0"]');
+        await wait(300);
+        // exports carry the choice and the electives lists
+        if (await sheetOpen()) await page.click("#btnMenu");
+        await tap("#btnExport");
+        const j = JSON.parse((await download(() => page.click('#exportMenu [data-dl="json"]:not([data-only])'))).data);
+        assert.ok(j.courses.find(c => c.code === "ENGR 3150U").electiveIn.some(p => /^Mechatronics/.test(p)));
+        assert.ok(j.electives.courses.length > 50 && Object.keys(j.electives.slots).length === 12);
+        // the drawer takes it out again, with Undo
+        await clickCard("ENGR 3150U");
+        await wait(500);
+        assert.match(await page.textContent("#details"), /Engineering elective/);
+        await page.click("#dElRemove");
+        await wait(500);
+        assert.equal(await page.$$eval('.card[data-code="ENGR 3150U"]', e => e.length), 0);
+        assert.equal(await slots(), "7,7");
+        await toastAct();
+        await wait(500);
+        assert.equal(await page.$$eval('.card[data-code="ENGR 3150U"]', e => e.length), 1, "Undo brings it back");
+        // leave the sheet as the other checks expect it
+        await page.click("#btnElectives");
+        await wait(300);
+        await tick("ENGR 3150U", 7);
+        await tick("INSE 4248U", 8);
+        await page.keyboard.press("Escape");
+        assert.equal(await slots(), "7,7,8");
+        await page.selectOption(await tool("#programFilter"), "");
+        await wait(500);
+        if (await sheetOpen()) await page.click("#btnMenu");
+        await shot("electives");
+      });
+
       await check("layouts and semester count", async () => {
         await tap('#modeSeg [data-mode="free"]');
         await wait(800);

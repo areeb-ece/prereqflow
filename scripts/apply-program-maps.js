@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-/* Reads the official Ontario Tech program-map PDFs and writes each program's own
- * semester for every course into the built-in data (the `semesters` map). Nothing else
- * in the data changes: names, requirements, notes and program lists stay as they are.
+/* Reads the official Ontario Tech program-map PDFs and writes into the built-in data
+ * each program's own semester for every course (the `semesters` map), and where each
+ * map places its engineering electives (`electives.slots`). Nothing else in the data
+ * changes: names, requirements, notes and program lists stay as they are. The courses
+ * that can fill those slots come from the electives list (scripts/apply-electives.js).
  *
  *   npm i --no-save pdfjs-dist@4.10.38
  *   node scripts/apply-program-maps.js <folder of PDFs> [--dry-run]
@@ -59,6 +61,7 @@ async function readMap(lib, file) {
   const byCode = new Map(data.courses.map(c => [c.code, c]));
   const progByName = new Map(data.programs.map(p => [norm(p), p]));
   const found = new Map(); // program → Map(code → [semesters])
+  const slots = new Map(); // program → [semesters of its engineering electives]
   const problems = [];
 
   const pdfs = fs.readdirSync(dir).filter(f => /\.pdf$/i.test(f)).sort();
@@ -69,15 +72,17 @@ async function readMap(lib, file) {
     if (!program) { problems.push(`${f}: title "${title}" doesn't name a built-in program; skipped`); continue; }
     if (found.has(program)) { problems.push(`${f}: ${program} was already read from another file; skipped`); continue; }
     if (!cells.length) { problems.push(`${f}: no program-map table found; skipped`); continue; }
-    const m = new Map();
+    const m = new Map(), el = [];
     for (const cell of cells) {
+      if (/^engineering\s+electives?$/i.test(cell.text.trim())) { el.push(cell.semester); continue; }
       const p = PF.parseCourseText(cell.text);
       if (!p || p.kind !== "course") continue;
       if (!m.has(p.code)) m.set(p.code, []);
       m.get(p.code).push(cell.semester);
     }
     found.set(program, m);
-    console.log(`${f} → ${program}: ${m.size} courses`);
+    slots.set(program, el.sort((a, b) => a - b));
+    console.log(`${f} → ${program}: ${m.size} courses, ${el.length} engineering elective${el.length === 1 ? "" : "s"}${el.length ? ` (${el.map(PF.semesterLabel).join(", ")})` : ""}`);
   }
 
   // write each program's semester; a program that lists a course twice keeps the earliest
@@ -113,6 +118,16 @@ async function readMap(lib, file) {
   if (problems.length) { console.log(`\n${problems.length} to check by hand`); for (const x of problems) console.log("  " + x); }
   const missing = data.programs.filter(p => !found.has(p));
   if (missing.length) console.log(`\nNo map read for: ${missing.join("; ")}`);
+
+  // elective slots, in the order of the programs list; a program with none has no entry
+  const prevSlots = (data.electives && data.electives.slots) || {};
+  const newSlots = {};
+  for (const p of data.programs) {
+    const s = found.has(p) ? slots.get(p) : prevSlots[p];
+    if (s && s.length) newSlots[p] = s;
+    if (found.has(p) && JSON.stringify(prevSlots[p] || []) !== JSON.stringify(s)) console.log(`  elective slots in ${p}: ${(prevSlots[p] || []).map(PF.semesterLabel).join(", ") || "none"} → ${s.map(PF.semesterLabel).join(", ") || "none"}`);
+  }
+  data.electives = { ...(data.electives || {}), slots: newSlots };
 
   if (dry) { console.log("\n--dry-run: nothing written"); return; }
   // keep the key order of the file: semesters sits right after term

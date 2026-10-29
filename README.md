@@ -120,6 +120,31 @@ Three requirements aren't plain course lists, and are shown on the card as a sma
   courses makes up the credits; every course counts as 3 credit hours. (Computer
   Networks' "54 credit hours" note is read the same way.)
 
+### Engineering electives
+
+Each program map leaves boxes for engineering electives, and the built-in data keeps
+them where the map puts them (for example two in Year 4 Sem 1 and one in Year 4 Sem 2
+for Mechatronics; none for the railway specializations or IoT). With one program shown in
+the **Semesters** layout, each box still to fill is a dashed **Engineering elective**
+card in its semester. Click one, or **Electives** in the strip, to choose:
+
+- Only that program's electives list is offered (from the faculty's 2026–2027 electives
+  list, in `sources/`), and only courses offered in the slot's term: Sem 1 of a year is
+  fall, Sem 2 winter. A course the program already requires isn't offered again.
+- An elective that needs special permission in the program says so, and so does one
+  whose prerequisites the program doesn't take before that semester (chosen electives
+  count, and so do completed courses). Both can still be chosen.
+- A semester with one slot swaps its elective; with more, untick one to choose another.
+- A chosen elective joins the sheet in the slot's semester, tagged **elective**, with its
+  prerequisite links. From then on it works like any other course: hover, highlights,
+  **Mark completed**, **Set a goal** and the path to it, image export and the JSON / CSV
+  exports, which carry the choice (`electiveIn`) and the electives lists. Its details
+  have **Change** and **Remove elective** (with Undo).
+
+Liberal studies and science electives aren't chosen here. Mechanical Engineering's
+Aerospace Specialization has an elective box, but the electives list names no course
+for it, so its slot says none are listed.
+
 ### Plan mode
 
 **Explore / Plan**, next to the name in the toolbar, switches between analysing the
@@ -234,6 +259,7 @@ js/chrome.js                  the phone menu sheet and focus kept inside dialogs
 js/parser.js        PF        course text / PDF table → course records
 js/layout.js        PFLayout  course records → card positions + routed links
 js/plan.js          PFPlan    completed + goal courses → availability and goal path
+js/electives.js     PFElectives  elective slots + electives lists → choices on the sheet
 js/image.js         PFImage   drawing ops → high-res PNG canvas or SVG
 js/app.js                     state, import, rendering, zoom, highlights, plan, export
 data/*.json                   built-in Ontario Tech data (PrereqFlow export format)
@@ -241,7 +267,10 @@ data/*.js                     the same data wrapped for <script> loading (genera
 assets/fonts/                 mononoki and Libre Franklin (SIL Open Font License)
 scripts/sync-design.js        copies the shared design system into css/fallback.css
 scripts/build-data.js         regenerates data/*.js from data/*.json
-tests/                        node:test suites for the parser, layout and planner, and a
+scripts/apply-program-maps.js per-program semesters and elective slots from the map PDFs
+scripts/apply-electives.js    the electives lists from sources/engineering-electives-*.json
+sources/                      the official program-map PDFs and the electives list
+tests/                        node:test suites for the parser, layout, planner and electives, and a
                               browser check that drives every feature (browser-check.js)
 ```
 
@@ -266,6 +295,18 @@ program view, the planner's "years one through three" rule and the course panel 
 use that program's value. JSON exports carry `semesters`; CSV exports carry a
 `Program semesters` column (`Program = 3-1; …`); both import back. Editing a course's
 semester inside a program view changes only that program.
+
+### Electives (`js/electives.js`)
+
+The data's `electives` holds `slots` (program → the semesters of its elective boxes)
+and `courses` (each elective's requirements, the `programs` that list it, the ones where
+it needs special `permission`, and the term it's `offered` in, per program where the
+list differs). Choosing one adds the program to the course's `programs`, sets its
+semester there to the slot's, and records the program in `electiveIn`; other programs
+that take the same course keep their own semester. Removing it undoes exactly that, and
+a course no program lists any more leaves the sheet. In the semester layout, open slots
+are passed to the layout as link-free placeholder cards, kept at the foot of their
+column above Capstone, whose links run along the bus.
 
 ### Layout (`js/layout.js`)
 
@@ -361,7 +402,7 @@ sites on areeb-ece.github.io). Nothing is uploaded anywhere.
 ## Development
 
 ```sh
-npm test               # parser, layout + planner tests (node:test, no dependencies)
+npm test               # parser, layout, planner + electives tests (node:test, no dependencies)
 npm run build:data     # regenerate data/*.js after editing data/*.json
 npm run check:data     # verify data/*.js matches data/*.json (run in CI)
 npm run sync:design    # copy the shared design system into css/fallback.css
@@ -386,8 +427,18 @@ node scripts/apply-program-maps.js path/to/maps
 npm run build:data
 ```
 
-It changes only the per-program semesters, and lists every change plus anything that
-doesn't line up between the maps and the data.
+It changes only the per-program semesters and the elective slots (each map's
+Engineering Elective boxes), and lists every change plus anything that doesn't line up
+between the maps and the data. The courses that can fill the slots come from the
+faculty's electives list:
+
+```sh
+node scripts/apply-electives.js sources/engineering-electives-2026-2027.json
+npm run build:data
+```
+
+Its program names (no year, "(AI Specialization)") must each match one built-in
+program, or nothing is written.
 
 To rebuild the built-in programs from scratch (new courses or requirements): set
 `PDF_IMPORT = true` in `js/app.js` (the PDF reader is kept but switched off), load the

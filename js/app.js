@@ -1,6 +1,7 @@
-/* PrereqFlow page: state, import, chart rendering, zoom, highlights, planning and exports.
- * Depends on PF (parser.js), PFLayout (layout.js), PFPlan (plan.js), PFImage (image.js)
- * and the built-in data set (window.PREREQFLOW_DEFAULT). */
+/* PrereqFlow page: state, import, chart rendering, zoom, highlights, planning, electives
+ * and exports. Depends on PF (parser.js), PFLayout (layout.js), PFPlan (plan.js),
+ * PFElectives (electives.js), PFImage (image.js) and the built-in data set
+ * (window.PREREQFLOW_DEFAULT). */
 (() => {
 "use strict";
 
@@ -32,18 +33,22 @@ const state = {
   courses: new Map(), programs: [], semCount: 8, filter: "", query: "",
   hovered: null, selected: null,
   mode: "semester", highlights: [], dimOthers: true,
+  electives: PFElectives.empty(), // each program's elective slots and the courses that fill them
 };
 
 function snapshot() {
   return JSON.stringify({
     semCount: state.semCount, programs: state.programs, courses: [...state.courses.values()],
     mode: state.mode, highlights: state.highlights, dimOthers: state.dimOthers, filter: state.filter,
+    electives: PFElectives.toData(state.electives),
   });
 }
 function loadSnapshot(json) {
   const o = typeof json === "string" ? JSON.parse(json) : json;
   state.courses = new Map((o.courses || []).map(c => { const n = normalizeCourse(c); return [n.code, n]; }));
   state.programs = Array.isArray(o.programs) ? o.programs.slice() : [];
+  // a session saved before electives existed takes the built-in lists for its built-in programs
+  state.electives = PFElectives.fromData(o.electives || (DEFAULT && DEFAULT.electives && PFElectives.toData(PFElectives.fromData(DEFAULT.electives), state.programs)));
   state.semCount = [4, 6, 8, 10, 12].includes(+o.semCount) ? +o.semCount : 8;
   if (o.mode === "free" || o.mode === "semester") state.mode = o.mode;
   state.highlights = Array.isArray(o.highlights)
@@ -127,7 +132,14 @@ function normalizeCourse(c) {
     notes: Array.isArray(c.notes) ? c.notes.map(String) : [],
     ignored: Array.isArray(c.ignored) ? c.ignored.map(String) : [],
     programs: Array.isArray(c.programs) ? c.programs.map(String) : [],
+    ...electiveIn(c),
   };
+}
+// the programs a course is a chosen engineering elective in (only those it's listed in)
+function electiveIn(c) {
+  const progs = Array.isArray(c.programs) ? c.programs.map(String) : [];
+  const list = (Array.isArray(c.electiveIn) ? c.electiveIn : typeof c.electiveIn === "string" ? c.electiveIn.split(/\s*[;|]\s*/) : []).map(String).filter(p => progs.includes(p));
+  return list.length ? { electiveIn: [...new Set(list)] } : {};
 }
 
 // ───────────────────────── PDF reading (pdf.js, loaded on first use) ─────────────────────────
@@ -247,7 +259,8 @@ function fromJson(text, fileName) {
   const p = o && o.plan;
   const planIn = p && (Array.isArray(p.completed) || Array.isArray(p.goals))
     ? { completed: (p.completed || []).map(PF.normCode).filter(Boolean), goals: (p.goals || []).map(PF.normCode).filter(Boolean) } : null;
-  return { records, programs, report: rep, semCount: o && +o.semesters, plan: planIn };
+  const electives = o && o.electives ? PFElectives.fromData(o.electives) : null;
+  return { records, programs, report: rep, semCount: o && +o.semesters, plan: planIn, electives };
 }
 function parseCSV(text) {
   const rows = [];
@@ -276,7 +289,7 @@ function fromCsv(text, fileName) {
   if (iCode < 0) return fromText(rows.map(r => r.join(" ")).join("\n"), PF.programFromFilename(fileName), fileName, "CSV");
   const iName = col("name", "course name", "title"), iSem = col("semester", "sem", "semester number"), iYT = col("year-semester", "year-term", "term", "term label");
   const iPre = col("prerequisites", "prerequisite", "prereqs", "prereq", "requires"), iCo = col("corequisites", "corequisite", "coreqs", "coreq");
-  const iNotes = col("notes", "note"), iIgn = col("ignored", "ignored text"), iProg = col("programs", "program"), iPS = col("program semesters");
+  const iNotes = col("notes", "note"), iIgn = col("ignored", "ignored text"), iProg = col("programs", "program"), iPS = col("program semesters"), iEl = col("elective in");
   // "Program A = 2-1; Program B = 3-1" (program names can contain ":" but not "=" or ";")
   const progSems = s => Object.fromEntries(splitList(s).map(x => { const i = x.lastIndexOf("="); return i > 0 ? [x.slice(0, i).trim(), x.slice(i + 1).trim()] : null; }).filter(Boolean));
   const get = (r, i) => (i >= 0 && r[i] != null ? String(r[i]).trim() : "");
@@ -290,7 +303,7 @@ function fromCsv(text, fileName) {
       code, name: get(r, iName), semester: get(r, iSem) || get(r, iYT),
       prereqs: [...pre.prereqs], coreqs: [...pre.coreqs, ...co.prereqs, ...co.coreqs],
       notes: [...splitList(get(r, iNotes)), ...pre.notes], ignored: [...splitList(get(r, iIgn)), ...pre.ignored],
-      programs: splitList(get(r, iProg)), semesters: progSems(get(r, iPS)),
+      programs: splitList(get(r, iProg)), semesters: progSems(get(r, iPS)), electiveIn: splitList(get(r, iEl)),
     }));
   }
   const rep = newReport(fileName, PF.programFromFilename(fileName), "CSV");
@@ -317,6 +330,7 @@ let replaceOnImport = false; // set by the start screen: the next import replace
 function clearSheet() {
   state.courses.clear(); state.programs = []; state.selected = state.hovered = null;
   state.filter = ""; state.query = ""; state.highlights = [];
+  state.electives = PFElectives.empty();
   $("#search").value = "";
 }
 function mergeBatches(batches) {
@@ -347,6 +361,7 @@ function mergeBatches(batches) {
   for (const b of batches) {
     PF.mergeInto(state.courses, b.records);
     for (const p of b.programs || []) if (p && !state.programs.includes(p)) state.programs.push(p);
+    if (b.electives) PFElectives.merge(state.electives, b.electives);
     if (b.semCount && [4, 6, 8, 10, 12].includes(b.semCount)) state.semCount = Math.max(state.semCount, b.semCount);
   }
   const fixes = PF.resolveCodes(state.courses);
@@ -425,7 +440,7 @@ async function importFiles(fileList) {
     if (files.length > 1) showToast(`<span class="spin"></span>Reading ${i + 1} of ${files.length}: ${esc(f.name)}`, 0);
     try {
       const res = await readFile(f);
-      batches.push({ records: res.records, programs: res.programs, label: res.report.program || f.name, semCount: res.semCount, plan: res.plan });
+      batches.push({ records: res.records, programs: res.programs, label: res.report.program || f.name, semCount: res.semCount, plan: res.plan, electives: res.electives });
       reports.push(res.report);
     } catch (e) {
       const r = newReport(f.name, PF.programFromFilename(f.name), "");
@@ -458,7 +473,7 @@ async function importFiles(fileList) {
 
 // ───────────────────────── layout + chart ─────────────────────────
 let view = null;
-let cardEls = new Map(), edgeEls = [];
+let cardEls = new Map(), slotEls = new Map(), edgeEls = [];
 let zoom = 1;
 const Z = { min: 0.12, max: 3 };
 
@@ -479,9 +494,22 @@ function visibleCourses() {
 // requirements written as notes (see plan.js) that the layout draws: Capstone's years 1–3
 const withRules = c => { const y = PFPlan.rules(c).yearsComplete; return y ? { ...c, yearsComplete: y } : c; };
 function computeView(courses = visibleCourses(), opts = {}) {
-  const lay = PFLayout.compute(courses.map(withRules), { mode: state.mode, semCount: opts.semCount || state.semCount });
+  const lay = PFLayout.compute(courses.map(withRules), { mode: state.mode, semCount: opts.semCount || state.semCount, slots: opts.slots });
   lay.visible = courses;
   return lay;
+}
+// the program in view's engineering electives still to choose, as placeholder cards in
+// their semester (the semester layout only: in free flow nothing places them)
+function viewSlots() {
+  const p = viewProgram();
+  if (!p || state.mode !== "semester") return [];
+  return PFElectives.openSlots(state.electives, state.courses, p).map(s => ({ id: `slot:${s.sem}:${s.i}`, semester: s.sem }));
+}
+// whether a card is a chosen elective here: in the program shown, or in every program
+// listing it when all are shown
+function isElective(c) {
+  const el = c.electiveIn || [], p = viewProgram();
+  return p ? el.includes(p) : el.length > 0 && el.length === c.programs.length;
 }
 
 // column header text for both layouts
@@ -524,9 +552,9 @@ let floatParams = new Map(), edgeGeo = [], floatAnims = new Map(), floatAmp = 0;
 let floatTimer = 0, floatOn = false, zoomChangedAt = 0, linksMoved = false, cullTimer = 0;
 function prepareFloat() {
   floatParams = new Map();
-  for (const n of view.nodes.values()) {
-    const h = hashCode(n.code);
-    floatParams.set(n.code, {
+  for (const n of [...view.nodes.values(), ...view.slots.values()]) {
+    const id = n.code || n.id, h = hashCode(id);
+    floatParams.set(id, {
       wave: n.x * 0.0042 + n.y * 0.0021,                 // shared wave: neighbours move together
       k1: 2 + (h % 2), k2: 1 + ((h >>> 3) % 2),           // per-card wobble harmonics
       p1: ((h >>> 5) % 628) / 100, p2: ((h >>> 13) % 628) / 100,
@@ -569,8 +597,8 @@ function cullFloat(rebuild = false) {
   const m = 0.12; // a little margin on every side
   const x0 = (vpEl.scrollLeft - m * vpEl.clientWidth) / zoom, x1 = (vpEl.scrollLeft + (1 + m) * vpEl.clientWidth) / zoom;
   const y0 = (vpEl.scrollTop - m * vpEl.clientHeight) / zoom, y1 = (vpEl.scrollTop + (1 + m) * vpEl.clientHeight) / zoom;
-  for (const [code, el] of cardEls) {
-    const n = view.nodes.get(code);
+  for (const [code, el] of [...cardEls, ...slotEls]) {
+    const n = view.nodes.get(code) || view.slots.get(code);
     const near = n && n.x + n.w > x0 && n.x < x1 && n.y + n.h > y0 && n.y < y1;
     if (near && !floatAnims.has(code)) floatCard(code, el);
     else if (!near && floatAnims.has(code)) { floatAnims.get(code).cancel(); floatAnims.delete(code); el.classList.remove("fl"); }
@@ -580,7 +608,7 @@ function scheduleCull() { clearTimeout(cullTimer); cullTimer = setTimeout(() => 
 function stopCardFloat() {
   for (const a of floatAnims.values()) a.cancel();
   floatAnims.clear();
-  for (const el of cardEls.values()) el.classList.remove("fl");
+  for (const el of [...cardEls.values(), ...slotEls.values()]) el.classList.remove("fl");
 }
 function movedPath(g, off) {
   const a = off.get(g.from) || [0, 0], b = off.get(g.to) || [0, 0];
@@ -634,7 +662,7 @@ function syncFloat() {
 
 function renderChart() {
   const before = view ? new Map([...view.nodes].map(([c, n]) => [c, { x: n.x, y: n.y }])) : null;
-  view = computeView();
+  view = computeView(visibleCourses(), { slots: viewSlots() });
   treeCache = null;
   planCache = null;
   const { width, height, nodes, dims: D } = view;
@@ -670,9 +698,14 @@ function renderChart() {
     const fresh = !before || !before.has(c.code);
     const delay = fresh ? `--in:${Math.min(900, p.col * 55 + (p.y / 76) * 10).toFixed(0)}ms` : "";
     const rq = ruleTag(c);
-    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${delay}" aria-label="${esc(`${c.code} ${c.name}, ${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${rq ? `<i class="rq" title="${esc(rq.title)}">${esc(rq.text)}</i>` : ""}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="pm"></span><span class="marks"></span></button>`;
+    const el = isElective(c);
+    return `<button type="button" class="card${fresh ? " rise" : ""}" data-code="${esc(c.code)}" style="left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px;${delay}" aria-label="${esc(`${c.code} ${c.name}, ${el ? "engineering elective, " : ""}${semLong(c.semester)}`)}"><span class="code">${esc(c.code)}${el ? `<i class="rq" title="Engineering elective">elective</i>` : rq ? `<i class="rq" title="${esc(rq.title)}">${esc(rq.text)}</i>` : ""}${c.programs.length > 1 ? `<i title="Listed in ${c.programs.length} programs">×${c.programs.length}</i>` : ""}</span><span class="name">${esc(c.name)}</span><span class="pm"></span><span class="marks"></span></button>`;
+  }).join("") + [...view.slots.values()].map(s => {
+    const n = slotChoices(viewProgram(), s.semester);
+    return `<button type="button" class="slot${n ? "" : " none"}" data-slot="${s.semester}" style="left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px" aria-label="${esc(`Engineering elective, ${semLong(s.semester)}: ${n ? "choose a course" : "none listed for this program"}`)}"><span class="code">Engineering elective</span><span class="name">${n ? "Choose a course" : "None listed for this program"}</span></button>`;
   }).join("");
   cardEls = new Map($$("#cards .card").map(el => [el.dataset.code, el]));
+  slotEls = new Map($$("#cards .slot").map((el, i) => [[...view.slots.keys()][i], el]));
   // cards that were already on the sheet glide from their old spot; links fade back in
   if (before && motionOn()) {
     let moved = false;
@@ -693,6 +726,7 @@ function renderChart() {
   renderColhead();
   applyHighlight();
   syncPlanbar();
+  syncElectivesBtn();
   syncFloat();
 }
 
@@ -1177,11 +1211,17 @@ function renderDetails() {
   if (cr) html += `<p class="plain mt">At least ${cr} credit hours completed (${Math.ceil(cr / PFPlan.CREDITS)} courses at 3 credit hours each). Not drawn as links.</p>`;
   if (c.coreqs.length) html += `<h3>Corequisites</h3><div class="groups">${groupsHtml(c.coreqs, "n")}</div><p class="plain muted mt">Taken before or alongside; drawn like prerequisites.</p>`;
   html += `<h3>Required by</h3>` + (unlocks.length ? `<div class="grp">${unlocks.map(x => chip(x, "u")).join("")}</div>` : `<p class="plain muted">Nothing loaded requires it.</p>`);
+  const elIn = (c.electiveIn || []).filter(p => !viewProgram() || p === viewProgram());
+  if (elIn.length) {
+    const perm = elIn.filter(p => { const o = state.electives.courses.get(c.code); return o && !o.programs.includes(p); });
+    html += `<h3>Engineering elective</h3><p class="plain">Chosen for ${esc(elIn.map(shortProg).join(", "))}${elIn.length === 1 && !viewProgram() ? ` in ${semLabel(PF.semIn(c, elIn[0]))}` : ""}.${perm.length ? ` Needs special permission${elIn.length > 1 ? ` in ${esc(perm.map(shortProg).join(", "))}` : ""}.` : ""}</p>`;
+    if (elIn.length === 1) html += `<div class="hlrow mt"><button type="button" class="btn sd-btn sd-small" id="dElChange" data-prog="${esc(elIn[0])}">Change</button><button type="button" class="btn sd-btn sd-small" id="dElRemove" data-prog="${esc(elIn[0])}">Remove elective</button></div>`;
+  }
   if (c.notes.length) html += `<h3>Notes</h3>${c.notes.map(n => `<p class="plain">${esc(n)}</p>`).join("")}`;
   if (c.ignored.length) html += `<h3>Ignored from the source</h3>${c.ignored.map(n => `<p class="plain muted">${esc(n)}</p>`).join("")}`;
   // each program's own semester, when they differ (otherwise the header says it)
   const varies = timingVaries(c);
-  if (c.programs.length) html += `<h3>${varies ? "Taken in" : "Listed in"}</h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}${varies ? ` <span class="muted">· ${semLabel(PF.semIn(c, p))}</span>` : ""}</li>`).join("")}</ul>`;
+  if (c.programs.length) html += `<h3>${varies ? "Taken in" : "Listed in"}</h3><ul class="proglist">${c.programs.map(p => `<li>${esc(shortProg(p))}${varies ? ` <span class="muted">· ${semLabel(PF.semIn(c, p))}</span>` : ""}${(c.electiveIn || []).includes(p) ? ` <span class="muted">· elective</span>` : ""}</li>`).join("")}</ul>`;
   html += `</div><footer><button class="btn sd-btn sd-small" type="button" id="dEdit">Edit</button><button class="btn danger sd-btn sd-small sd-danger" type="button" id="dDelete">Delete</button></footer>`;
   d.innerHTML = html;
   d.hidden = false;
@@ -1242,6 +1282,7 @@ function syncControls() {
     if (pf.value !== state.filter) { state.filter = ""; pf.value = ""; }
   } else state.filter = "";
   $("#semCount").value = String(state.semCount);
+  syncElectivesBtn();
 }
 function syncPlanbar(has = state.courses.size > 0) {
   const on = plan.on && has;
@@ -1329,6 +1370,7 @@ function loadDefault(program) {
   replaceOnImport = false;
   state.courses = new Map(DEFAULT.courses.map(c => { const n = normalizeCourse(c); return [n.code, n]; }));
   state.programs = DEFAULT.programs.slice();
+  state.electives = PFElectives.fromData(DEFAULT.electives);
   state.semCount = [4, 6, 8, 10, 12].includes(+DEFAULT.semesters) ? +DEFAULT.semesters : 8;
   state.filter = program || "";
   persist();
@@ -1499,6 +1541,7 @@ function saveEdit() {
     notes: old ? old.notes : [...pre.notes, ...co.notes],
     ignored: old ? old.ignored : [...pre.ignored, ...co.ignored],
     programs: old ? old.programs : prog ? [prog] : [],
+    ...(old && old.electiveIn && old.electiveIn.length ? { electiveIn: old.electiveIn } : {}),
   };
   const undo = snapshot();
   state.courses.set(code, course);
@@ -1520,6 +1563,94 @@ function deleteCourse(code) {
   persist();
   render();
   showToast(`Deleted ${esc(code)}`, 5000, { label: "Undo", run: () => restoreUndo(undo) });
+}
+
+// ───────────────────────── engineering electives ─────────────────────────
+// Each program map leaves slots for engineering electives (see electives.js). A slot is
+// filled from that program's electives list, with a course offered in the slot's term;
+// the course then sits on the sheet like any other course of the program.
+const termName = sem => PFElectives.termOf(sem) === "fall" ? "fall" : "winter";
+const programsWithSlots = () => state.programs.filter(p => PFElectives.slotsIn(state.electives, p).length);
+// the Electives button: for the program shown, or (all programs shown) for any with slots
+function syncElectivesBtn() {
+  const shown = viewProgram(), withSlots = programsWithSlots();
+  $("#btnElectives").hidden = !state.courses.size || !(shown ? withSlots.includes(shown) : !state.filter && withSlots.length);
+}
+// how many courses could fill a slot in that semester (0: the program lists none)
+const slotChoices = (program, sem) => PFElectives.options(state.electives, state.courses, program, sem, plan.completed).list.length;
+let electiveProgram = "", electiveFocus = 0;
+function openElectives(sem = 0) {
+  const progs = programsWithSlots();
+  const p = viewProgram();
+  electiveProgram = progs.includes(p) ? p : progs.includes(electiveProgram) ? electiveProgram : "";
+  electiveFocus = sem;
+  renderElectives();
+  openDialog("#electiveDlg");
+  const sec = sem && $(`#electiveBody [data-sec="${sem}"]`);
+  if (sec) setTimeout(() => { sec.scrollIntoView({ block: "nearest" }); const f = sec.querySelector("input:not(:disabled)"); if (f) f.focus(); }, 0);
+}
+function renderElectives() {
+  const body = $("#electiveBody");
+  const progs = programsWithSlots().sort((a, b) => a.localeCompare(b));
+  const P = electiveProgram;
+  $("#electiveTitle").textContent = P && P === viewProgram() ? `Engineering electives · ${shortProg(P)}` : "Engineering electives";
+  let h = "";
+  if (!P || P !== viewProgram()) {
+    h += `<label class="sd-field elprog"><span class="sd-label">Program</span><span class="sd-select"><select id="elProgram"><option value="">Choose a program</option>${progs.map(p => `<option value="${esc(p)}"${p === P ? " selected" : ""}>${esc(shortProg(p))}</option>`).join("")}</select></span></label>`;
+  }
+  if (!P) { body.innerHTML = h + `<p class="help mt">Engineering electives are chosen for one program at a time; choosing a program here shows it on the sheet.</p>`; return; }
+  h += `<p class="help">The slots ${esc(shortProg(P))}'s program map leaves for engineering electives. Each takes a course from the program's electives list that is offered in its term, and a chosen course joins the sheet in that semester. Liberal studies electives aren't included.</p>`;
+  const table = PFElectives.slotTable(state.electives, state.courses, P);
+  for (const row of table) {
+    const { list, other } = PFElectives.options(state.electives, state.courses, P, row.sem, plan.completed);
+    const full = row.open === 0;
+    h += `<section class="elsem" data-sec="${row.sem}"${row.sem === electiveFocus ? ' data-focus="1"' : ""}><h3>${semLabel(row.sem)} <span>${termName(row.sem)} · ${plural(row.total, "elective")}</span></h3>`;
+    if (!list.length) h += `<p class="plain muted">No engineering electives are listed for ${esc(shortProg(P))}${other.length ? ` in ${termName(row.sem)}` : ""}.</p>`;
+    else {
+      h += `<div class="elopts">`;
+      for (const o of list) {
+        const elsewhere = o.chosenAt && !o.chosen;
+        const off = elsewhere || (!o.chosen && full && row.total > 1);
+        const grp = g => g.join(" or ");
+        const why = [];
+        if (o.permission) why.push("Needs special permission in this program");
+        if (o.prereqs.length) why.push(`Needs ${o.prereqs.map(grp).join(", ")} first`);
+        if (o.coreqs.length) why.push(`Coreq ${o.coreqs.map(grp).join(", ")}`);
+        if (elsewhere) why.push(`Chosen for ${semLabel(o.chosenAt)}`);
+        h += `<label class="elopt sd-check${o.chosen ? " on" : ""}${off ? " off" : ""}"><input type="checkbox" data-el="${esc(o.code)}" data-sem="${row.sem}"${o.chosen ? " checked" : ""}${off ? " disabled" : ""}><span class="c">${esc(o.code)}</span><span class="n">${esc(o.name)}</span>${why.length ? `<span class="w">${why.map(esc).join(" · ")}</span>` : ""}</label>`;
+      }
+      h += `</div>`;
+      if (full && row.total > 1) h += `<p class="plain muted mt">Untick one to choose another.</p>`;
+    }
+    // the program's electives from the other term, when no slot of that term lists them
+    if (other.length && list.length && !table.some(r => termName(r.sem) !== termName(row.sem))) h += `<p class="plain muted mt">Only in ${termName(row.sem + 1)}, so not for this slot: ${esc(other.join(", "))}.</p>`;
+    h += `</section>`;
+  }
+  body.innerHTML = h;
+}
+// put an elective in (or take it out of) one of the program's slots
+function setElective(program, code, sem, on) {
+  const undo = snapshot();
+  if (on) {
+    const row = PFElectives.slotTable(state.electives, state.courses, program).find(r => r.sem === sem);
+    if (!row) return;
+    // a semester with one slot swaps its elective; with more, one has to be unticked first
+    if (!row.open) { if (row.total > 1) return; for (const x of row.chosen) PFElectives.unchoose(state.courses, program, x); }
+    if (!PFElectives.choose(state.courses, state.electives, program, sem, code)) return;
+  } else {
+    PFElectives.unchoose(state.courses, program, code);
+    dropGone();
+  }
+  lastUndo = null;
+  persist();
+  render();
+  return undo;
+}
+// forget pins and highlights on courses that left the sheet
+function dropGone() {
+  if (state.selected && !state.courses.has(state.selected)) state.selected = null;
+  if (state.hovered && !state.courses.has(state.hovered)) state.hovered = null;
+  state.highlights = state.highlights.filter(h => state.courses.has(h.code));
 }
 
 // two-step confirmation inside the page
@@ -1566,20 +1697,23 @@ function buildExport(kind, onlyFilter) {
       programs: state.programs.filter(p => programs.includes(p)),
       courses: list.map(c => {
         const sems = exportSemesters(c);
-        return { code: c.code, name: c.name, semester: c.semester, term: PF.semesterLabel(c.semester), ...(sems ? { semesters: sems } : {}), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs };
+        return { code: c.code, name: c.name, semester: c.semester, term: PF.semesterLabel(c.semester), ...(sems ? { semesters: sems } : {}), prereqs: c.prereqs, coreqs: c.coreqs, notes: c.notes, ignored: c.ignored, programs: c.programs, ...(c.electiveIn && c.electiveIn.length ? { electiveIn: c.electiveIn } : {}) };
       }),
     };
+    // the elective slots and lists, so the exported programs can still choose
+    const el = PFElectives.toData(state.electives, data.programs);
+    if (Object.keys(el.slots).length || el.courses.length) data.electives = el;
     if (plan.completed.size || plan.goals.length) data.plan = { completed: [...plan.completed].sort(cmpCode), goals: plan.goals.slice() };
     return { filename: base + ".json", data: JSON.stringify(data, null, 2) + "\n", mime: "application/json" };
   }
   if (kind === "csv") {
     const q = v => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
     const fmt = gs => gs.map(g => g.join(" or ")).join(", ");
-    const lines = [["Code", "Name", "Semester", "Year-Semester", "Prerequisites", "Corequisites", "Notes", "Ignored", "Programs", "Program semesters"].join(",")];
+    const lines = [["Code", "Name", "Semester", "Year-Semester", "Prerequisites", "Corequisites", "Notes", "Ignored", "Programs", "Program semesters", "Elective in"].join(",")];
     for (const c of list) {
       const sems = exportSemesters(c);
       const ps = sems ? Object.entries(sems).map(([p, n]) => `${p} = ${PF.semesterLabel(n)}`).join("; ") : "";
-      lines.push([c.code, c.name, String(c.semester), PF.semesterLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; "), ps].map(q).join(","));
+      lines.push([c.code, c.name, String(c.semester), PF.semesterLabel(c.semester), fmt(c.prereqs), fmt(c.coreqs), c.notes.join("; "), c.ignored.join("; "), c.programs.join("; "), ps, (c.electiveIn || []).join("; ")].map(q).join(","));
     }
     return { filename: base + ".csv", data: "﻿" + lines.join("\r\n") + "\r\n", mime: "text/csv" };
   }
@@ -1832,7 +1966,7 @@ function buildImageSpec(o) {
         ops.push({ t: "text", x: xr, y: y + 19, text: `×${c.programs.length}`, size: 10.5, color: P.ink3, anchor: "end", a });
         xr -= PFImage.measure(`×${c.programs.length}`, 10.5) + 6;
       }
-      const rq = ruleTag(c);
+      const rq = isElective(c) ? { text: "elective" } : ruleTag(c);
       if (rq) {
         const tw = PFImage.measure(rq.text, 10) + 10;
         ops.push({ t: "rect", x: xr - tw, y: y + 8, w: tw, h: 14, r: 4, stroke: P.rule, sw: 1, a });
@@ -1841,6 +1975,15 @@ function buildImageSpec(o) {
     }
     PFImage.wrap(c.name, n.w - 20, 11, 400, 2).forEach((line, i) => ops.push({ t: "text", x: x + 10, y: y + 36 + i * 15, text: line, size: 11, color: pc && pc.done ? P.ink3 : P.ink2, a }));
     if (tc) tc.forEach((ci, i) => ops.push({ t: "rect", x: x + n.w - 6 - 10 * (tc.length - i), y: y + n.h - 12, w: 7, h: 7, r: 3.5, fill: P.h[ci] }));
+  }
+  // engineering electives still to choose, as on the sheet
+  if (lay === view) for (const n of view.slots.values()) {
+    const x = X(n.x), y = Y(n.y);
+    if (x > W || x + n.w < 0 || y > top + chH || y + n.h < top) continue;
+    const a = dim || path ? 0.4 : 1;
+    ops.push({ t: "rect", x, y, w: n.w, h: n.h, r: 10, stroke: P.ink3, sw: 1, dash: [5, 4], a });
+    ops.push({ t: "text", x: x + 10, y: y + 19, text: "Engineering elective", size: 12.5, weight: 700, color: P.ink2, a });
+    ops.push({ t: "text", x: x + 10, y: y + 36, text: "Not chosen yet", size: 11, color: P.ink3, a });
   }
   ops.push(...chrome);
 
@@ -2131,6 +2274,25 @@ $("#imageForm").addEventListener("change", updateImageDims);
 $("#imageForm").addEventListener("submit", e => { e.preventDefault(); runImageExport(); });
 $("#imgGo").addEventListener("click", runImageExport);
 
+// electives
+$("#btnElectives").addEventListener("click", () => openElectives());
+$("#electiveBody").addEventListener("change", e => {
+  if (e.target.id === "elProgram") {
+    electiveProgram = e.target.value;
+    if (electiveProgram) { state.filter = electiveProgram; state.hovered = null; persist(); render(); fitAll(false); }
+    renderElectives();
+    return;
+  }
+  const b = e.target.closest("[data-el]");
+  if (!b || !electiveProgram) return;
+  setElective(electiveProgram, b.dataset.el, +b.dataset.sem, b.checked);
+  const keep = $("#electiveBody").scrollTop;
+  renderElectives();
+  $("#electiveBody").scrollTop = keep;
+  const again = $(`#electiveBody [data-el="${CSS.escape(b.dataset.el)}"][data-sem="${b.dataset.sem}"]`);
+  if (again) again.focus();
+});
+
 $("#programFilter").addEventListener("change", e => {
   state.filter = e.target.value; state.hovered = null;
   persist();
@@ -2177,6 +2339,8 @@ cards.addEventListener("animationend", e => { if (e.animationName === "rise") e.
 cards.addEventListener("pointerleave", () => { if (state.hovered) { state.hovered = null; applyHighlight(); } });
 cards.addEventListener("click", e => {
   if (suppressClick) { suppressClick = false; return; }
+  const sl = e.target.closest(".slot");
+  if (sl) { openElectives(+sl.dataset.slot); return; }
   const c = e.target.closest(".card");
   if (!c) { if (state.selected) select(null); return; }
   if (e.shiftKey) { setHighlight(c.dataset.code, state.highlights.some(h => h.code === c.dataset.code) ? null : "pre"); return; }
@@ -2221,6 +2385,15 @@ $("#details").addEventListener("click", e => {
       plan.completed.clear(); planChanged();
       showToast("Cleared completed courses", 6000, { label: "Undo", run: () => { plan.completed = undo; planChanged(); } });
     });
+    return;
+  }
+  const elc = e.target.closest("#dElChange");
+  if (elc) { const c = state.courses.get(state.selected); electiveProgram = elc.dataset.prog; openElectives(PF.semIn(c, elc.dataset.prog)); return; }
+  const elr = e.target.closest("#dElRemove");
+  if (elr) {
+    const code = state.selected;
+    const undo = setElective(elr.dataset.prog, code, 0, false);
+    if (undo) showToast(`Removed ${esc(code)} from ${esc(shortProg(elr.dataset.prog))}'s electives`, 5000, { label: "Undo", run: () => restoreUndo(undo) });
     return;
   }
   if (e.target.closest("#dEdit")) { openEdit(state.selected); return; }

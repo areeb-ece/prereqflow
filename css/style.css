@@ -237,6 +237,19 @@ svg.edges.settling { opacity: 0; transition: none; }
 .card.is-root { box-shadow: 0 0 0 3px color-mix(in srgb, var(--hc) 32%, transparent); }
 .card.is-selected::after { content: ""; position: absolute; inset: 3px; border: 1.5px dashed var(--ink-3); border-radius: calc(var(--r) - 3px); pointer-events: none; }
 .card.is-focus.is-selected::after { border-color: var(--focus-ink); }
+/* an engineering elective still to choose: a dashed placeholder in its semester */
+.slot {
+  position: absolute; padding: 7px 10px 6px; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  border: 1px dashed var(--ink-4); border-radius: var(--r); background: color-mix(in srgb, var(--card) 45%, transparent);
+  cursor: pointer; overflow: hidden; will-change: transform; -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-2), border-color var(--dur-2);
+}
+.slot:focus-visible { outline-offset: 3px; }
+.slot .code { font: var(--fw-head) var(--fig-code)/1.2 var(--font-mono); letter-spacing: .01em; color: var(--ink-2); }
+.slot .name { font: var(--fw-text) var(--fig-name)/1.3 var(--font-mono); color: var(--accent); }
+.slot.none { cursor: default; }
+.slot.none .name { color: var(--ink-3); }
+@media (hover: hover) { .slot:not(.none):hover { border-color: var(--accent); background: var(--tint); } }
 :root[data-motion="off"] .card, :root[data-motion="off"] .flow { animation: none !important; }
 
 .marquee { position: absolute; z-index: var(--z-sticky); border: 1.5px dashed var(--accent); border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 8%, transparent); pointer-events: none; }
@@ -395,6 +408,21 @@ details.skipped ul { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); }
 .rtable .err { color: var(--danger-ink); }
 .rsum { margin: 0 0 var(--sp-4); font-size: var(--fs-3); }
 .rsum b { font-weight: var(--fw-head); }
+/* electives dialog: one section per semester with slots */
+.elprog { max-width: 24rem; margin-bottom: var(--sp-3); }
+.elsem { margin-top: var(--sp-4); }
+.elsem h3 { display: flex; align-items: baseline; gap: var(--sp-2); margin: 0 0 var(--sp-2); font: var(--fw-strong) var(--fs-2)/1.3 var(--font-text); color: var(--ink); }
+.elsem h3 span { font-weight: var(--fw-text); color: var(--ink-3); }
+.elopts { display: grid; gap: var(--sp-1); }
+.elopt.sd-check { display: grid; grid-template-columns: 18px 6.5rem minmax(0, 1fr); align-items: baseline; gap: 2px var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--rule-2); border-radius: var(--r-sm); background: var(--card); }
+.elopt input { align-self: center; }
+.elopt .c { font: var(--fw-head) var(--fs-1) var(--font-mono); color: var(--ink); }
+.elopt .n { min-width: 0; color: var(--ink-2); }
+.elopt .w { grid-column: 3; font-size: var(--fs-1); color: var(--ink-3); }
+.elopt.on { border-color: var(--accent); background: var(--tint); }
+.elopt.off { opacity: .55; }
+@media (hover: hover) { .elopt:not(.off):hover { border-color: var(--ink-4); } }
+@media (max-width: 560px) { .elopt.sd-check { grid-template-columns: 18px minmax(0, 1fr); } .elopt .n, .elopt .w { grid-column: 2; } }
 .rsec { margin-top: var(--sp-5); }
 .rsec h3 { margin: 0 0 var(--sp-2); font: var(--fw-strong) var(--fs-2)/1.3 var(--font-text); color: var(--ink); }
 .rsec ul { display: grid; gap: var(--sp-1); margin: 0; padding-left: var(--sp-5); color: var(--ink-2); overflow-wrap: anywhere; }

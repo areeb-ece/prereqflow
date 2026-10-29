@@ -580,7 +580,12 @@ const PF = (() => {
     for (const c0 of incoming) {
       const c = { ...c0, code: normCode(c0.code) };
       const ex = map.get(c.code);
-      if (!ex) { map.set(c.code, { ...c, semesters: { ...(c.semesters || {}) }, prereqs: dedupeGroups(c.prereqs || []), coreqs: dedupeGroups(c.coreqs || []), notes: [...new Set(c.notes || [])], ignored: [...new Set(c.ignored || [])], programs: [...new Set(c.programs || [])] }); continue; }
+      if (!ex) {
+        const n = { ...c, semesters: { ...(c.semesters || {}) }, prereqs: dedupeGroups(c.prereqs || []), coreqs: dedupeGroups(c.coreqs || []), notes: [...new Set(c.notes || [])], ignored: [...new Set(c.ignored || [])], programs: [...new Set(c.programs || [])] };
+        if (c.electiveIn && c.electiveIn.length) n.electiveIn = [...new Set(c.electiveIn)]; else delete n.electiveIn;
+        map.set(c.code, n);
+        continue;
+      }
       ex.semesters = programSemesters(ex);
       for (const [prog, sem] of Object.entries(programSemesters(c))) ex.semesters[prog] = ex.semesters[prog] ? Math.min(ex.semesters[prog], sem) : sem;
       ex.semester = Math.min(ex.semester, c.semester, ...Object.values(ex.semesters));
@@ -590,6 +595,9 @@ const PF = (() => {
       ex.notes = [...new Set([...(ex.notes || []), ...(c.notes || [])])];
       ex.ignored = [...new Set([...(ex.ignored || []), ...(c.ignored || [])])];
       ex.programs = [...new Set([...(ex.programs || []), ...(c.programs || [])])];
+      // programs that take it as a chosen engineering elective (see electives.js)
+      const el = [...new Set([...(ex.electiveIn || []), ...(c.electiveIn || [])])].filter(p => ex.programs.includes(p));
+      if (el.length) ex.electiveIn = el; else delete ex.electiveIn;
     }
     return map;
   }

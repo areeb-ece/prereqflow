@@ -31,6 +31,7 @@ image of it.
 - Free flow lays out the graph so every prerequisite is always left of the courses that need it, with
   a tested Sugiyama-style layout.
 - Plan mode computes availability and a step-by-step goal path; completions count in every program.
+- Each program's engineering electives fill the slots its map leaves, only from its own electives list and only with courses offered in that term; a chosen elective is an ordinary course from then on.
 - A static page with no server, no account and no tracking; everything stays in the browser.
 
 ## Operating Context
