@@ -3524,5 +3524,1131 @@
         "Software Engineering 2026-2027"
       ]
     }
-  ]
+  ],
+  "electives": {
+    "slots": {
+      "Automotive Engineering 2026-2027": [
+        7,
+        7,
+        8,
+        8
+      ],
+      "Software Engineering 2026-2027": [
+        7,
+        8,
+        8
+      ],
+      "Nuclear Engineering 2026-2027": [
+        7,
+        7,
+        8,
+        8,
+        8
+      ],
+      "Mechatronics Engineering 2026-2027": [
+        7,
+        7,
+        8
+      ],
+      "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027": [
+        8
+      ],
+      "Mechanical Engineering: Aerospace Specialization 2026-2027": [
+        8
+      ],
+      "Mechanical Engineering 2026-2027": [
+        7,
+        8,
+        8,
+        8
+      ],
+      "Manufacturing Engineering 2026-2027": [
+        8
+      ],
+      "Industrial Engineering 2026-2027": [
+        7,
+        8
+      ],
+      "Energy Engineering 2026-2027": [
+        8,
+        8,
+        8
+      ],
+      "Electrical Engineering: Smart Grid Specialization 2026-2027": [
+        7,
+        8
+      ],
+      "Electrical Engineering 2026-2027": [
+        7,
+        7,
+        7,
+        7,
+        8,
+        8
+      ]
+    },
+    "courses": [
+      {
+        "code": "ARTE 4110U",
+        "name": "Deep Learning Architecture and Algorithms",
+        "prereqs": [
+          [
+            "SOFE 3620U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Software Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "ARTE 4200U",
+        "name": "AI Engineering and Machine Learning Operations",
+        "prereqs": [
+          [
+            "SOFE 3290U"
+          ],
+          [
+            "SOFE 3620U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Software Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "AUTE 3450U",
+        "name": "Combustion and Engines",
+        "prereqs": [
+          [
+            "CHEM 1800U"
+          ],
+          [
+            "MECE 2320U",
+            "MECE 2640U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Energy Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "AUTE 4060U",
+        "name": "Automotive Structural Design",
+        "prereqs": [
+          [
+            "AUTE 2010U"
+          ],
+          [
+            "MECE 3220U",
+            "AUTE 3170U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "AUTE 4090U",
+        "name": "Autonomous Vehicles",
+        "prereqs": [
+          [
+            "MECE 3390U",
+            "AUTE 3500U"
+          ],
+          [
+            "AUTE 2010U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "AUTE 4100U",
+        "name": "Road Vehicle Aerodynamics",
+        "prereqs": [
+          [
+            "MECE 2860U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "ELEE 3110U",
+        "name": "Signals and Systems",
+        "prereqs": [
+          [
+            "ENGR 2100U"
+          ],
+          [
+            "ELEE 2210U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [],
+        "permission": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "fall"
+      },
+      {
+        "code": "ELEE 4120U",
+        "name": "Introduction to Power Electronics",
+        "prereqs": [
+          [
+            "ELEE 3100U"
+          ],
+          [
+            "ELEE 3230U"
+          ],
+          [
+            "ELEE 3250U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027"
+        ],
+        "permission": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "fall"
+      },
+      {
+        "code": "ELEE 4125U",
+        "name": "Smart Grid Networking and Security",
+        "prereqs": [
+          [
+            "ELEE 4115U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Energy Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "ELEE 4140U",
+        "name": "Power System Protection Relaying",
+        "prereqs": [
+          [
+            "ELEE 3100U"
+          ],
+          [
+            "ELEE 3230U"
+          ],
+          [
+            "ELEE 3250U"
+          ],
+          [
+            "ELEE 3260U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "ELEE 4150U",
+        "name": "Advanced Control Systems",
+        "prereqs": [
+          [
+            "ELEE 3100U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "winter"
+      },
+      {
+        "code": "ELEE 4180U",
+        "name": "Special Topics in Electrical Engineering",
+        "prereqs": [],
+        "coreqs": [],
+        "notes": [
+          "Prerequisite is permission of the instructor (no course prerequisite); topic varies by offering."
+        ],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": {
+          "Electrical Engineering 2026-2027": "winter",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027": "fall"
+        }
+      },
+      {
+        "code": "ELEE 4420U",
+        "name": "Digital Signal Processing",
+        "prereqs": [
+          [
+            "ELEE 3110U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": {
+          "Electrical Engineering 2026-2027": "fall",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027": "winter"
+        }
+      },
+      {
+        "code": "ELEE 4500U",
+        "name": "Wireless Communications",
+        "prereqs": [
+          [
+            "ELEE 3070U"
+          ],
+          [
+            "ELEE 3130U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "ELEE 4750U",
+        "name": "Microwave & RF Circuits",
+        "prereqs": [
+          [
+            "ELEE 3230U"
+          ],
+          [
+            "ELEE 3240U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "ENEE 3265U",
+        "name": "Hydrogen and Fuel Cells",
+        "prereqs": [
+          [
+            "MECE 2320U",
+            "NUCL 2010U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "ENEE 4460U",
+        "name": "Sustainable Community Energy Systems",
+        "prereqs": [
+          [
+            "MECE 3260U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Energy Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "ENGR 3011U",
+        "name": "Introduction to Railway Systems",
+        "prereqs": [],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Electrical Engineering 2026-2027",
+          "Electrical Engineering: Smart Grid Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "ENGR 3150U",
+        "name": "Artificial Intelligence & Machine Learning",
+        "prereqs": [
+          [
+            "STAT 2800U"
+          ],
+          [
+            "ENGR 2100U",
+            "SOFE 2710U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "ENGR 3160U",
+        "name": "Engineering Operations and Project Management",
+        "prereqs": [],
+        "coreqs": [],
+        "notes": [
+          "Not an engineering elective for 'and Management' students."
+        ],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "INSE 4170U",
+        "name": "Human-System Integration (Human Machine Interface)",
+        "prereqs": [
+          [
+            "MANE 3300U",
+            "MANE 3190U"
+          ],
+          [
+            "MANE 3460U"
+          ],
+          [
+            "METE 4200U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [],
+        "permission": [
+          "Manufacturing Engineering 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "fall"
+      },
+      {
+        "code": "INSE 4248U",
+        "name": "Industrial Cyber- Physical Systems",
+        "prereqs": [
+          [
+            "MANE 3300U",
+            "MANE 3190U"
+          ],
+          [
+            "INSE 3142U"
+          ],
+          [
+            "ENGR 3150U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [],
+        "permission": [
+          "Manufacturing Engineering 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 3120U",
+        "name": "Thermo-mechanical Processing of Materials",
+        "prereqs": [
+          [
+            "MANE 2220U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Industrial Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MANE 3300U",
+        "name": "Integrated Manufacturing Systems",
+        "prereqs": [
+          [
+            "MANE 3190U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 3460U",
+        "name": "Industrial Ergonomics",
+        "prereqs": [],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 4015U",
+        "name": "Reliability and Maintenance",
+        "prereqs": [
+          [
+            "STAT 2800U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 4045U",
+        "name": "Quality Control",
+        "prereqs": [
+          [
+            "STAT 2800U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 4110U",
+        "name": "Design for Manufacturing",
+        "prereqs": [
+          [
+            "MANE 3190U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MANE 4190U",
+        "name": "Principles of Material Removal Processes",
+        "prereqs": [
+          [
+            "MANE 3190U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Industrial Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 4380U",
+        "name": "Life Cycle Engineering",
+        "prereqs": [],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Industrial Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MANE 4600U",
+        "name": "Additive Manufacturing",
+        "prereqs": [
+          [
+            "MECE 3030U"
+          ],
+          [
+            "MANE 3190U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MANE 4700U",
+        "name": "Introduction to Tribology: Friction, Wear, and Lubrication",
+        "prereqs": [
+          [
+            "MANE 2220U"
+          ],
+          [
+            "MECE 2860U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Manufacturing Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 2640U",
+        "name": "Thermodynamics and Heat Transfer",
+        "prereqs": [
+          [
+            "MATH 1020U"
+          ],
+          [
+            "PHY 1010U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Industrial Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 3030U",
+        "name": "Computer-Aided Design",
+        "prereqs": [
+          [
+            "MECE 2310U"
+          ],
+          [
+            "MECE 2420U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Industrial Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 3210U",
+        "name": "Mechanical Vibrations",
+        "prereqs": [
+          [
+            "ENGR 2020U",
+            "MECE 2430U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Industrial Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 3220U",
+        "name": "Machine Design",
+        "prereqs": [
+          [
+            "MECE 2310U"
+          ],
+          [
+            "MECE 2420U"
+          ],
+          [
+            "MECE 3270U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 3230U",
+        "name": "Thermodynamic Applications",
+        "prereqs": [
+          [
+            "MECE 2320U",
+            "MECE 2640U",
+            "NUCL 2010U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Energy Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 3260U",
+        "name": "Introduction to Energy Systems",
+        "prereqs": [
+          [
+            "NUCL 2010U",
+            "MECE 2320U",
+            "MECE 2640U"
+          ],
+          [
+            "ENVS 1000U",
+            "ENGR 1015U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 3390U",
+        "name": "Mechatronics",
+        "prereqs": [
+          [
+            "MECE 3270U"
+          ],
+          [
+            "MECE 3350U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Manufacturing Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 3410U",
+        "name": "Electro-Mechanical Energy Conversion",
+        "prereqs": [
+          [
+            "ELEE 2790U"
+          ],
+          [
+            "MECE 2320U",
+            "MECE 2640U",
+            "NUCL 2010U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 3420U",
+        "name": "Solid Mechanics II",
+        "prereqs": [
+          [
+            "MECE 2420U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 4210U",
+        "name": "Advanced Solid Mechanics and Stress Analysis",
+        "prereqs": [
+          [
+            "MECE 3420U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "MECE 4250U",
+        "name": "Advanced Materials Engineering",
+        "prereqs": [
+          [
+            "MANE 2220U"
+          ],
+          [
+            "MECE 2420U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Industrial Engineering 2026-2027",
+          "Mechanical Engineering 2026-2027",
+          "Mechanical Engineering: Artificial Intelligence Specialization 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "MECE 4290U",
+        "name": "Finite Element Methods",
+        "prereqs": [
+          [
+            "ENGR 2100U",
+            "MATH 2070U"
+          ],
+          [
+            "MECE 2310U"
+          ],
+          [
+            "MECE 2420U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Automotive Engineering 2026-2027",
+          "Industrial Engineering 2026-2027",
+          "Manufacturing Engineering 2026-2027",
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "METE 4280U",
+        "name": "Robotics & Automation",
+        "prereqs": [
+          [
+            "MECE 3350U",
+            "METE 3400U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Mechanical Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "METE 4500U",
+        "name": "Machine Vision for Robotic Systems",
+        "prereqs": [],
+        "coreqs": [
+          [
+            "METE 4280U"
+          ]
+        ],
+        "notes": [],
+        "programs": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "NUCL 4460U",
+        "name": "Nuclear Power Systems",
+        "prereqs": [
+          [
+            "NUCL 3930U",
+            "MECE 3930U",
+            "MECE 2640U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Energy Engineering 2026-2027",
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "NUCL 4625U",
+        "name": "Radioactive Waste Management Design",
+        "prereqs": [
+          [
+            "RADI 3570U"
+          ],
+          [
+            "NUCL 3930U"
+          ],
+          [
+            "NUCL 4610U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [
+          "Credit restriction: NUCL 4620U."
+        ],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "NUCL 4730U",
+        "name": "Reactor Control",
+        "prereqs": [
+          [
+            "NUCL 3820U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "NUCL 4810U",
+        "name": "Nuclear Fuel Cycles",
+        "prereqs": [
+          [
+            "NUCL 4610U"
+          ],
+          [
+            "NUCL 4780U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "NUCL 4880U",
+        "name": "Principles of Fusion Energy",
+        "prereqs": [
+          [
+            "NUCL 2240U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [
+          "Credit restriction: ENGR 4880U."
+        ],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "RADI 3570U",
+        "name": "Environmental Effects of Radiation",
+        "prereqs": [
+          [
+            "NUCL 2950U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "RADI 4550U",
+        "name": "Radiation Detection and Measurement",
+        "prereqs": [
+          [
+            "NUCL 2500U"
+          ],
+          [
+            "NUCL 2950U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Nuclear Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "SOFE 4630U",
+        "name": "Cloud Computing",
+        "prereqs": [
+          [
+            "SOFE 4790U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Software Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "winter"
+      },
+      {
+        "code": "SOFE 4640U",
+        "name": "Mobile Application Development",
+        "prereqs": [
+          [
+            "SOFE 3950U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Software Engineering 2026-2027"
+        ],
+        "permission": [],
+        "offered": "fall"
+      },
+      {
+        "code": "SOFE 4820U",
+        "name": "Modelling and Simulation",
+        "prereqs": [
+          [
+            "SOFE 3770U"
+          ],
+          [
+            "STAT 2800U"
+          ]
+        ],
+        "coreqs": [],
+        "notes": [],
+        "programs": [
+          "Software Engineering 2026-2027"
+        ],
+        "permission": [
+          "Mechatronics Engineering 2026-2027"
+        ],
+        "offered": "winter"
+      }
+    ]
+  }
 }

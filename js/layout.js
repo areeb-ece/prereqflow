@@ -20,6 +20,10 @@
  * links: they take no part in ordering or placement, and run from each card's right
  * edge down a riser in the gutter, along a bus under the whole sheet, and up into
  * the course, so they stay clear of the ordinary links.
+ *
+ * In the semester layout, `opts.slots` ([{ id, semester }]) adds placeholder cards with
+ * no links (a program's engineering electives still to choose). They sit at the foot of
+ * their semester's column, above any bus-fed course, and come back in `slots`.
  */
 const PFLayout = (() => {
   "use strict";
@@ -165,10 +169,12 @@ const PFLayout = (() => {
   }
 
   // ── main ─────────────────────────────────────────────────────────────────
-  // courses: course records; opts: { mode: "semester"|"free", semCount, dims }
+  // courses: course records; opts: { mode: "semester"|"free", semCount, dims, slots }
   function compute(courses, opts = {}) {
     const D = { ...DIMS, ...(opts.dims || {}) };
     const mode = opts.mode === "free" ? "free" : "semester";
+    const slotList = mode === "semester" ? (opts.slots || []).filter(s => s && s.id && s.semester >= 1) : [];
+    const slotIds = new Set(slotList.map(s => s.id));
     const g = buildGraph(courses);
     const codes = courses.map(c => c.code);
 
@@ -179,12 +185,13 @@ const PFLayout = (() => {
     } else {
       col = new Map(courses.map(c => [c.code, Math.max(0, (c.semester || 1) - 1)]));
     }
-    const maxCol = Math.max(0, ...col.values());
+    const maxCol = Math.max(0, ...col.values(), ...slotList.map(s => s.semester - 1));
     const nCols = mode === "free" ? (courses.length ? maxCol + 1 : 1) : Math.max(opts.semCount || 1, maxCol + 1);
 
     // items: cards and lane slots (dummies). Each item: { id, col, h, card, w8 }
     const items = new Map();
     for (const c of codes) items.set(c, { id: c, col: col.get(c), h: D.cardH, card: true });
+    for (const s of slotList) items.set(s.id, { id: s.id, col: s.semester - 1, h: D.cardH, card: true });
     const segs = new Map(); // "a|b" → [a, b] between adjacent columns, a left of b
     const addSeg = (a, b) => { const k = a + "|" + b; if (!segs.has(k)) segs.set(k, [a, b]); };
     const routes = [];
@@ -214,9 +221,11 @@ const PFLayout = (() => {
     for (const s of segList) segsBetween[items.get(s[0]).col].push(s);
 
     // ── 3. order within columns
-    // courses fed by the bus sit at the bottom of their column, next to the bus
+    // courses fed by the bus sit at the bottom of their column, next to the bus, and
+    // placeholder slots just above them
     const sink = new Set(routes.filter(r => r.kind === "bus").map(r => r.to));
-    const sunk = (a, b) => sink.has(a) - sink.has(b);
+    const rank = id => (sink.has(id) ? 2 : slotIds.has(id) ? 1 : 0);
+    const sunk = (a, b) => rank(a) - rank(b);
     const cols = Array.from({ length: nCols }, () => []);
     for (const it of items.values()) cols[it.col].push(it.id);
     const idx = new Map();
@@ -256,7 +265,7 @@ const PFLayout = (() => {
           const c = cols[k];
           for (let i = 0; i + 1 < c.length; i++) {
             const a = c[i], b = c[i + 1];
-            if (sink.has(a) !== sink.has(b)) continue;
+            if (rank(a) !== rank(b)) continue;
             if (localCross(b, a) < localCross(a, b)) {
               c[i] = b; c[i + 1] = a; idx.set(b, i); idx.set(a, i + 1); improved = true;
             }
@@ -316,6 +325,11 @@ const PFLayout = (() => {
     for (const c of codes) {
       const k = col.get(c);
       nodes.set(c, { code: c, col: k, x: colX(k), y: Math.round(cy.get(c) + shift - D.cardH / 2), w: D.colW, h: D.cardH });
+    }
+    const slots = new Map();
+    for (const s of slotList) {
+      const k = s.semester - 1;
+      slots.set(s.id, { id: s.id, semester: s.semester, col: k, x: colX(k), y: Math.round(cy.get(s.id) + shift - D.cardH / 2), w: D.colW, h: D.cardH });
     }
     const lanes = [];
     for (const it of items.values()) if (!it.card) lanes.push({ id: it.id, owner: it.owner, col: it.col, x: colX(it.col), y: cy.get(it.id) + shift });
@@ -392,7 +406,7 @@ const PFLayout = (() => {
     const lastBus = busTargets.length ? busY.get(busTargets[busTargets.length - 1]) : -Infinity;
     const height = Math.max(D.padT + D.cardH + D.padB, Math.round(bottom + shift + D.padB), lastBus + D.padB);
     return {
-      mode, dims: D, nCols, cols: colsOut, colX, nodes, lanes, edges,
+      mode, dims: D, nCols, cols: colsOut, colX, nodes, slots, lanes, edges,
       preds: g.preds, succs: g.succs, width, height, crossings: best,
     };
   }

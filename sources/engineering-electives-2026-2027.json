@@ -1,0 +1,1078 @@
+{
+  "meta": {
+    "school": "Ontario Tech University, Faculty of Engineering and Applied Science",
+    "electives_list": "Engineering electives, Fall 2026 / Winter 2027 (Electives List page)",
+    "prerequisites_source": "2026-2027 Undergraduate Academic Calendar",
+    "programs_note": "Each program name also covers its 'and Management' version.",
+    "prerequisites_format": "List of groups: every group is required; any one course inside a group satisfies it (e.g. [[A],[B,C]] = A and (B or C)).",
+    "line_format": "CODE Name (prerequisites), using ', ' for 'and' and ' or ' for 'or'. Courses with no course prerequisites have no parentheses.",
+    "offered_values": [
+      "fall",
+      "winter",
+      "both",
+      "conflicting"
+    ],
+    "generated": "2026-10-29"
+  },
+  "courses": [
+    {
+      "code": "ARTE 4110U",
+      "name": "Deep Learning Architecture and Algorithms",
+      "line": "ARTE 4110U Deep Learning Architecture and Algorithms (SOFE 3620U)",
+      "prerequisites": [
+        [
+          "SOFE 3620U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Software Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "ARTE 4200U",
+      "name": "AI Engineering & Machine Learning Operations",
+      "line": "ARTE 4200U AI Engineering & Machine Learning Operations (SOFE 3290U, SOFE 3620U)",
+      "prerequisites": [
+        [
+          "SOFE 3290U"
+        ],
+        [
+          "SOFE 3620U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Software Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "AUTE 3450U",
+      "name": "Combustion & Engines",
+      "line": "AUTE 3450U Combustion & Engines (CHEM 1800U, MECE 2320U or MECE 2640U)",
+      "prerequisites": [
+        [
+          "CHEM 1800U"
+        ],
+        [
+          "MECE 2320U",
+          "MECE 2640U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Energy Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "AUTE 4060U",
+      "name": "Automotive Structural Design",
+      "line": "AUTE 4060U Automotive Structural Design (AUTE 2010U, MECE 3220U or AUTE 3170U)",
+      "prerequisites": [
+        [
+          "AUTE 2010U"
+        ],
+        [
+          "MECE 3220U",
+          "AUTE 3170U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "AUTE 4090U",
+      "name": "Autonomous Vehicles",
+      "line": "AUTE 4090U Autonomous Vehicles (MECE 3390U or AUTE 3500U, AUTE 2010U)",
+      "prerequisites": [
+        [
+          "MECE 3390U",
+          "AUTE 3500U"
+        ],
+        [
+          "AUTE 2010U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "AUTE 4100U",
+      "name": "Road Vehicle Aerodynamics",
+      "line": "AUTE 4100U Road Vehicle Aerodynamics (MECE 2860U)",
+      "prerequisites": [
+        [
+          "MECE 2860U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "ELEE 3110U",
+      "name": "Signals and Systems",
+      "line": "ELEE 3110U Signals and Systems (ENGR 2100U, ELEE 2210U)",
+      "prerequisites": [
+        [
+          "ENGR 2100U"
+        ],
+        [
+          "ELEE 2210U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [],
+      "special_permission_in": [
+        "Mechatronics Engineering"
+      ],
+      "offered": "fall"
+    },
+    {
+      "code": "ELEE 4120U",
+      "name": "Introduction to Power Electronics",
+      "line": "ELEE 4120U Introduction to Power Electronics (ELEE 3100U, ELEE 3230U, ELEE 3250U)",
+      "prerequisites": [
+        [
+          "ELEE 3100U"
+        ],
+        [
+          "ELEE 3230U"
+        ],
+        [
+          "ELEE 3250U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering"
+      ],
+      "special_permission_in": [
+        "Mechatronics Engineering"
+      ],
+      "offered": "fall"
+    },
+    {
+      "code": "ELEE 4125U",
+      "name": "Smart Grid Networking and Security",
+      "line": "ELEE 4125U Smart Grid Networking and Security (ELEE 4115U)",
+      "prerequisites": [
+        [
+          "ELEE 4115U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Energy Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "ELEE 4140U",
+      "name": "Power System Protection Relaying",
+      "line": "ELEE 4140U Power System Protection Relaying (ELEE 3100U, ELEE 3230U, ELEE 3250U, ELEE 3260U)",
+      "prerequisites": [
+        [
+          "ELEE 3100U"
+        ],
+        [
+          "ELEE 3230U"
+        ],
+        [
+          "ELEE 3250U"
+        ],
+        [
+          "ELEE 3260U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "ELEE 4150U",
+      "name": "Advanced Control Systems",
+      "line": "ELEE 4150U Advanced Control Systems (ELEE 3100U)",
+      "prerequisites": [
+        [
+          "ELEE 3100U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [
+        "Mechatronics Engineering"
+      ],
+      "offered": "winter"
+    },
+    {
+      "code": "ELEE 4180U",
+      "name": "Special Topics in Electrical Engineering",
+      "line": "ELEE 4180U Special Topics in Electrical Engineering",
+      "prerequisites": [],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "conflicting",
+      "offered_by_program": {
+        "Electrical Engineering": "winter",
+        "Electrical Engineering (Smart Grid Specialization)": "fall"
+      },
+      "notes": "Prerequisite is permission of the instructor (no course prerequisite); topic varies by offering."
+    },
+    {
+      "code": "ELEE 4420U",
+      "name": "Digital Signal Processing",
+      "line": "ELEE 4420U Digital Signal Processing (ELEE 3110U)",
+      "prerequisites": [
+        [
+          "ELEE 3110U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "conflicting",
+      "offered_by_program": {
+        "Electrical Engineering": "fall",
+        "Electrical Engineering (Smart Grid Specialization)": "winter"
+      }
+    },
+    {
+      "code": "ELEE 4500U",
+      "name": "Wireless Communications",
+      "line": "ELEE 4500U Wireless Communications (ELEE 3070U, ELEE 3130U)",
+      "prerequisites": [
+        [
+          "ELEE 3070U"
+        ],
+        [
+          "ELEE 3130U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "ELEE 4750U",
+      "name": "Microwave & RF Circuits",
+      "line": "ELEE 4750U Microwave & RF Circuits (ELEE 3230U, ELEE 3240U)",
+      "prerequisites": [
+        [
+          "ELEE 3230U"
+        ],
+        [
+          "ELEE 3240U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "ENEE 3265U",
+      "name": "Hydrogen and Fuel Cells",
+      "line": "ENEE 3265U Hydrogen and Fuel Cells (MECE 2320U or NUCL 2010U)",
+      "prerequisites": [
+        [
+          "MECE 2320U",
+          "NUCL 2010U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "ENEE 4460U",
+      "name": "Sustainable Community Energy Systems",
+      "line": "ENEE 4460U Sustainable Community Energy Systems (MECE 3260U)",
+      "prerequisites": [
+        [
+          "MECE 3260U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Energy Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "ENGR 3011U",
+      "name": "Introduction to Railway Systems",
+      "line": "ENGR 3011U Introduction to Railway Systems",
+      "prerequisites": [],
+      "corequisites": [],
+      "elective_in": [
+        "Electrical Engineering",
+        "Electrical Engineering (Smart Grid Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "ENGR 3150U",
+      "name": "Artificial Intelligence and Machine Learning",
+      "line": "ENGR 3150U Artificial Intelligence and Machine Learning (STAT 2800U, ENGR 2100U or SOFE 2710U)",
+      "prerequisites": [
+        [
+          "STAT 2800U"
+        ],
+        [
+          "ENGR 2100U",
+          "SOFE 2710U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "ENGR 3160U",
+      "name": "Engineering Operations and Project Management",
+      "line": "ENGR 3160U Engineering Operations and Project Management",
+      "prerequisites": [],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Manufacturing Engineering",
+        "Mechanical Engineering",
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall",
+      "notes": "Not an engineering elective for 'and Management' students."
+    },
+    {
+      "code": "INSE 4170U",
+      "name": "Human-System Integration",
+      "line": "INSE 4170U Human-System Integration (MANE 3300U or MANE 3190U, MANE 3460U, METE 4200U)",
+      "prerequisites": [
+        [
+          "MANE 3300U",
+          "MANE 3190U"
+        ],
+        [
+          "MANE 3460U"
+        ],
+        [
+          "METE 4200U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [],
+      "special_permission_in": [
+        "Manufacturing Engineering",
+        "Mechatronics Engineering"
+      ],
+      "offered": "fall"
+    },
+    {
+      "code": "INSE 4248U",
+      "name": "Industrial Cyber-Physical Systems",
+      "line": "INSE 4248U Industrial Cyber-Physical Systems (MANE 3300U or MANE 3190U, INSE 3142U, ENGR 3150U)",
+      "prerequisites": [
+        [
+          "MANE 3300U",
+          "MANE 3190U"
+        ],
+        [
+          "INSE 3142U"
+        ],
+        [
+          "ENGR 3150U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [],
+      "special_permission_in": [
+        "Manufacturing Engineering",
+        "Mechatronics Engineering"
+      ],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 3120U",
+      "name": "Thermo-mechanical Processing of Materials",
+      "line": "MANE 3120U Thermo-mechanical Processing of Materials (MANE 2220U)",
+      "prerequisites": [
+        [
+          "MANE 2220U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Industrial Engineering",
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MANE 3300U",
+      "name": "Integrated Manufacturing Systems",
+      "line": "MANE 3300U Integrated Manufacturing Systems (MANE 3190U)",
+      "prerequisites": [
+        [
+          "MANE 3190U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 3460U",
+      "name": "Industrial Ergonomics",
+      "line": "MANE 3460U Industrial Ergonomics",
+      "prerequisites": [],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)",
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 4015U",
+      "name": "Reliability & Maintenance",
+      "line": "MANE 4015U Reliability & Maintenance (STAT 2800U)",
+      "prerequisites": [
+        [
+          "STAT 2800U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 4045U",
+      "name": "Quality Control",
+      "line": "MANE 4045U Quality Control (STAT 2800U)",
+      "prerequisites": [
+        [
+          "STAT 2800U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)",
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 4110U",
+      "name": "Design for Manufacturing",
+      "line": "MANE 4110U Design for Manufacturing (MANE 3190U)",
+      "prerequisites": [
+        [
+          "MANE 3190U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MANE 4190U",
+      "name": "Principles of Material Removal Processes",
+      "line": "MANE 4190U Principles of Material Removal Processes (MANE 3190U)",
+      "prerequisites": [
+        [
+          "MANE 3190U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Industrial Engineering",
+        "Manufacturing Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 4380U",
+      "name": "Life Cycle Engineering",
+      "line": "MANE 4380U Life Cycle Engineering",
+      "prerequisites": [],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Industrial Engineering",
+        "Manufacturing Engineering",
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MANE 4600U",
+      "name": "Additive Manufacturing",
+      "line": "MANE 4600U Additive Manufacturing (MECE 3030U, MANE 3190U)",
+      "prerequisites": [
+        [
+          "MECE 3030U"
+        ],
+        [
+          "MANE 3190U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MANE 4700U",
+      "name": "Introduction to Tribology: Friction, Wear, and Lubrication",
+      "line": "MANE 4700U Introduction to Tribology: Friction, Wear, and Lubrication (MANE 2220U, MECE 2860U)",
+      "prerequisites": [
+        [
+          "MANE 2220U"
+        ],
+        [
+          "MECE 2860U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Manufacturing Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 2640U",
+      "name": "Thermodynamics & Heat Transfer",
+      "line": "MECE 2640U Thermodynamics & Heat Transfer (MATH 1020U, PHY 1010U)",
+      "prerequisites": [
+        [
+          "MATH 1020U"
+        ],
+        [
+          "PHY 1010U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Industrial Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 3030U",
+      "name": "Computer-Aided Design",
+      "line": "MECE 3030U Computer-Aided Design (MECE 2310U, MECE 2420U)",
+      "prerequisites": [
+        [
+          "MECE 2310U"
+        ],
+        [
+          "MECE 2420U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Industrial Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 3210U",
+      "name": "Mechanical Vibrations",
+      "line": "MECE 3210U Mechanical Vibrations (ENGR 2020U or MECE 2430U)",
+      "prerequisites": [
+        [
+          "ENGR 2020U",
+          "MECE 2430U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Industrial Engineering",
+        "Manufacturing Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 3220U",
+      "name": "Machine Design",
+      "line": "MECE 3220U Machine Design (MECE 2310U, MECE 2420U, MECE 3270U)",
+      "prerequisites": [
+        [
+          "MECE 2310U"
+        ],
+        [
+          "MECE 2420U"
+        ],
+        [
+          "MECE 3270U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 3230U",
+      "name": "Thermodynamic Applications",
+      "line": "MECE 3230U Thermodynamic Applications (MECE 2320U or MECE 2640U or NUCL 2010U)",
+      "prerequisites": [
+        [
+          "MECE 2320U",
+          "MECE 2640U",
+          "NUCL 2010U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Energy Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 3260U",
+      "name": "Introduction to Energy Systems",
+      "line": "MECE 3260U Introduction to Energy Systems (NUCL 2010U or MECE 2320U or MECE 2640U, ENVS 1000U or ENGR 1015U)",
+      "prerequisites": [
+        [
+          "NUCL 2010U",
+          "MECE 2320U",
+          "MECE 2640U"
+        ],
+        [
+          "ENVS 1000U",
+          "ENGR 1015U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 3390U",
+      "name": "Mechatronics",
+      "line": "MECE 3390U Mechatronics (MECE 3270U, MECE 3350U)",
+      "prerequisites": [
+        [
+          "MECE 3270U"
+        ],
+        [
+          "MECE 3350U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Manufacturing Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 3410U",
+      "name": "Electro-Mechanical Energy Conversion",
+      "line": "MECE 3410U Electro-Mechanical Energy Conversion (ELEE 2790U, MECE 2320U or MECE 2640U or NUCL 2010U)",
+      "prerequisites": [
+        [
+          "ELEE 2790U"
+        ],
+        [
+          "MECE 2320U",
+          "MECE 2640U",
+          "NUCL 2010U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Manufacturing Engineering",
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 3420U",
+      "name": "Solid Mechanics II",
+      "line": "MECE 3420U Solid Mechanics II (MECE 2420U)",
+      "prerequisites": [
+        [
+          "MECE 2420U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 4210U",
+      "name": "Advanced Solid Mechanics and Stress Analysis",
+      "line": "MECE 4210U Advanced Solid Mechanics and Stress Analysis (MECE 3420U)",
+      "prerequisites": [
+        [
+          "MECE 3420U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Manufacturing Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "MECE 4250U",
+      "name": "Advanced Materials Engineering",
+      "line": "MECE 4250U Advanced Materials Engineering (MANE 2220U, MECE 2420U)",
+      "prerequisites": [
+        [
+          "MANE 2220U"
+        ],
+        [
+          "MECE 2420U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Industrial Engineering",
+        "Mechanical Engineering",
+        "Mechanical Engineering (AI Specialization)"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "MECE 4290U",
+      "name": "Finite Element Methods",
+      "line": "MECE 4290U Finite Element Methods (ENGR 2100U or MATH 2070U, MECE 2310U, MECE 2420U)",
+      "prerequisites": [
+        [
+          "ENGR 2100U",
+          "MATH 2070U"
+        ],
+        [
+          "MECE 2310U"
+        ],
+        [
+          "MECE 2420U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Automotive Engineering",
+        "Industrial Engineering",
+        "Manufacturing Engineering",
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "METE 4280U",
+      "name": "Robotics & Automation",
+      "line": "METE 4280U Robotics & Automation (MECE 3350U or METE 3400U)",
+      "prerequisites": [
+        [
+          "MECE 3350U",
+          "METE 3400U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Mechanical Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "METE 4500U",
+      "name": "Machine Vision for Robotic Systems",
+      "line": "METE 4500U Machine Vision for Robotic Systems (Coreq: METE 4280U)",
+      "prerequisites": [],
+      "corequisites": [
+        [
+          "METE 4280U"
+        ]
+      ],
+      "elective_in": [
+        "Mechatronics Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "NUCL 4460U",
+      "name": "Nuclear Power Systems",
+      "line": "NUCL 4460U Nuclear Power Systems (NUCL 3930U or MECE 3930U or MECE 2640U)",
+      "prerequisites": [
+        [
+          "NUCL 3930U",
+          "MECE 3930U",
+          "MECE 2640U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Energy Engineering",
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "NUCL 4625U",
+      "name": "Radioactive Waste Management Design",
+      "line": "NUCL 4625U Radioactive Waste Management Design (RADI 3570U, NUCL 3930U, NUCL 4610U)",
+      "prerequisites": [
+        [
+          "RADI 3570U"
+        ],
+        [
+          "NUCL 3930U"
+        ],
+        [
+          "NUCL 4610U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall",
+      "notes": "Credit restriction: NUCL 4620U."
+    },
+    {
+      "code": "NUCL 4730U",
+      "name": "Reactor Control",
+      "line": "NUCL 4730U Reactor Control (NUCL 3820U)",
+      "prerequisites": [
+        [
+          "NUCL 3820U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "NUCL 4810U",
+      "name": "Nuclear Fuel Cycles",
+      "line": "NUCL 4810U Nuclear Fuel Cycles (NUCL 4610U, NUCL 4780U)",
+      "prerequisites": [
+        [
+          "NUCL 4610U"
+        ],
+        [
+          "NUCL 4780U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "NUCL 4880U",
+      "name": "Principles of Fusion Energy",
+      "line": "NUCL 4880U Principles of Fusion Energy (NUCL 2240U)",
+      "prerequisites": [
+        [
+          "NUCL 2240U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter",
+      "notes": "Credit restriction: ENGR 4880U."
+    },
+    {
+      "code": "RADI 3570U",
+      "name": "Environmental Effects of Radiation",
+      "line": "RADI 3570U Environmental Effects of Radiation (NUCL 2950U)",
+      "prerequisites": [
+        [
+          "NUCL 2950U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "RADI 4550U",
+      "name": "Radiation Detection and Measurement",
+      "line": "RADI 4550U Radiation Detection and Measurement (NUCL 2500U, NUCL 2950U)",
+      "prerequisites": [
+        [
+          "NUCL 2500U"
+        ],
+        [
+          "NUCL 2950U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Nuclear Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "SOFE 4630U",
+      "name": "Cloud Computing",
+      "line": "SOFE 4630U Cloud Computing (SOFE 4790U)",
+      "prerequisites": [
+        [
+          "SOFE 4790U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Software Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "winter"
+    },
+    {
+      "code": "SOFE 4640U",
+      "name": "Mobile Application Development",
+      "line": "SOFE 4640U Mobile Application Development (SOFE 3950U)",
+      "prerequisites": [
+        [
+          "SOFE 3950U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Software Engineering"
+      ],
+      "special_permission_in": [],
+      "offered": "fall"
+    },
+    {
+      "code": "SOFE 4820U",
+      "name": "Modelling and Simulation",
+      "line": "SOFE 4820U Modelling and Simulation (SOFE 3770U, STAT 2800U)",
+      "prerequisites": [
+        [
+          "SOFE 3770U"
+        ],
+        [
+          "STAT 2800U"
+        ]
+      ],
+      "corequisites": [],
+      "elective_in": [
+        "Software Engineering"
+      ],
+      "special_permission_in": [
+        "Mechatronics Engineering"
+      ],
+      "offered": "winter"
+    }
+  ]
+}
